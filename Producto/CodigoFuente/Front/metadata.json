@@ -1,0 +1,5 @@
+{
+  "name": "[TESTING]Bluegrid OCR Manager",
+  "description": "Aquaculture OCR Management System for processing and validating digitized matrices via Google Colab backend.",
+  "requestFramePermissions": []
+}
