@@ -1,174 +1,145 @@
 # BluegridOCR
 
-Repositorio de entrega del proyecto **BluegridOCR**, sistema web para digitalizar planillas acuícolas mediante visión artificial. El proyecto permite subir imágenes de tablillas o plantillas de campo, procesarlas con Claude Vision, extraer una matriz estructurada de datos, corregir resultados manualmente y guardar los registros en PostgreSQL/Supabase para trazabilidad, dashboard operativo y análisis por usuario.
+## Aviso critico antes de levantar el sistema
+
+Por razones de seguridad, el archivo `.env` real no se sube al repositorio. Las variables de entorno necesarias se encuentran documentadas dentro del informe de entrega y deben copiarse manualmente para crear el archivo:
+
+```txt
+Producto/CodigoFuente/Deploy/backend_api/.env
+```
+
+Es vital crear ese archivo en la carpeta `Deploy/backend_api` antes de ejecutar el backend, Docker o el script `run.py`. Sin ese `.env`, el sistema no tendra conexion a Supabase, clave de Anthropic ni secreto JWT.
+
+No subir el `.env` a Git. Solo debe versionarse `.env.example`.
+
+---
+
+BluegridOCR es un sistema web para digitalizar planillas acuicolas mediante vision artificial. Permite subir imagenes de tablillas o plantillas de campo, procesarlas con Claude Vision, extraer una matriz estructurada de datos, corregir resultados manualmente y guardar los registros en PostgreSQL/Supabase para trazabilidad, dashboard operativo y analisis por usuario.
 
 ---
 
 ## Tabla de contenidos
 
-* [Descripción general](#descripción-general)
-* [Objetivo del proyecto](#objetivo-del-proyecto)
-* [Estructura del repositorio de entrega](#estructura-del-repositorio-de-entrega)
-* [Estructura técnica del producto](#estructura-técnica-del-producto)
-* [Stack tecnológico](#stack-tecnológico)
-* [Roles y permisos](#roles-y-permisos)
-* [Flujo funcional del sistema](#flujo-funcional-del-sistema)
+* [Aviso critico antes de levantar el sistema](#aviso-critico-antes-de-levantar-el-sistema)
+* [Descripcion general](#descripcion-general)
+* [Estructura actualizada del proyecto](#estructura-actualizada-del-proyecto)
+* [Stack tecnologico](#stack-tecnologico)
 * [Variables de entorno](#variables-de-entorno)
-* [Instalación local](#instalación-local)
-* [Ejecución local](#ejecución-local)
+* [Guia para levantar el servicio](#guia-para-levantar-el-servicio)
+* [Ejecucion con Docker](#ejecucion-con-docker)
+* [Endpoints de verificacion](#endpoints-de-verificacion)
+* [Roles y permisos](#roles-y-permisos)
 * [Base de datos y migraciones](#base-de-datos-y-migraciones)
-* [Autenticación y seguridad](#autenticación-y-seguridad)
-* [Endpoints principales](#endpoints-principales)
-* [Deploy con Docker](#deploy-con-docker)
 * [Pruebas recomendadas](#pruebas-recomendadas)
-* [Contenido por carpeta](#contenido-por-carpeta)
-* [Buenas prácticas operativas](#buenas-prácticas-operativas)
-* [Estado del proyecto](#estado-del-proyecto)
+* [Recordatorio final sobre el .env](#recordatorio-final-sobre-el-env)
 
 ---
 
-## Descripción general
+## Descripcion general
 
-BluegridOCR nace como una solución para apoyar la digitalización de registros acuícolas escritos manualmente en terreno. En el contexto operativo, buzos o personal de campo pueden completar planillas o tablillas físicas con información relevante. Luego, el sistema permite fotografiar esas plantillas, procesarlas con visión artificial y transformar la información visual en datos estructurados.
+El sistema reduce el trabajo manual asociado a la lectura y transcripcion de planillas acuicolas. El flujo principal es:
 
-El sistema no busca reemplazar completamente la revisión humana, sino acelerar el proceso de extracción y reducir errores de transcripción mediante un flujo semi-automatizado:
-
-1. El usuario sube una imagen.
-2. El backend procesa la imagen con Claude Vision.
-3. El sistema genera una matriz digitalizada.
-4. El usuario revisa y corrige los datos.
-5. El registro se guarda en base de datos.
-6. La información queda disponible para dashboard, trazabilidad y análisis.
-
----
-
-## Objetivo del proyecto
-
-El objetivo principal de BluegridOCR es reducir la carga manual asociada a la lectura, transcripción y consolidación de planillas acuícolas, entregando un sistema que permita:
-
-* Digitalizar datos de terreno desde imágenes.
-* Estandarizar la captura de información.
-* Reducir errores humanos de transcripción.
-* Guardar registros estructurados en una base de datos.
-* Consultar datos mediante dashboard operativo.
-* Analizar actividad por usuario o buzo.
-* Mantener trazabilidad sobre quién digitaliza, corrige o valida información.
+1. El usuario inicia sesion.
+2. El usuario sube una imagen de una tablilla o plantilla.
+3. El backend procesa la imagen con Claude Vision.
+4. El sistema genera una matriz digitalizada.
+5. El usuario revisa y corrige los datos.
+6. El registro se guarda en PostgreSQL/Supabase.
+7. La informacion queda disponible para dashboard, trazabilidad y analisis.
 
 ---
 
-## Estructura del repositorio de entrega
-
-La estructura del repositorio está organizada según los apartados solicitados para la entrega del proyecto:
+## Estructura actualizada del proyecto
 
 ```txt
 BluegridOCR/
-├── README.md
-│
-├── Documentacion/
-│   ├── Informe/
-│   ├── UML/
-│   ├── Wireframe/
-│   ├── MER/
-│   └── Gantt/
-│
-├── Producto/
-│   ├── CodigoFuente/
-│   │   ├── Front/
-│   │   ├── Deploy/
-│   │   ├── run.py
-│   │   ├── docker-compose.prod.yml
-│   │   └── README_TECNICO.md
-│   │
-│   ├── Scripts_BD/
-│   ├── Librerias/
-│   └── Datos_Prueba/
-│
-└── Gestion/
-    ├── Integrantes.txt
-    └── README_Gestion.md
+|-- README.md
+|-- .gitignore
+|
+|-- Documentacion/
+|   |-- Informe/
+|   |-- Gantt/
+|   |   |-- CartaGantt.png
+|   |-- MER/
+|   |   |-- MER.png
+|   |-- UML/
+|   |   |-- CasosdeUso.png
+|   |   |-- DiagramadeFlujo.png
+|   |   |-- DiagramPaqueteServicios.png
+|   |   |-- ModeloVista4_1.png
+|   |-- Wireframe/
+|
+|-- Gestion/
+|   |-- Integrantes.txt
+|   |-- README_Gestion.md
+|
+|-- Producto/
+|   |-- Datos_Prueba/
+|   |-- Librerias/
+|   |-- Scripts_BD/
+|   |   |-- MERBluegrid.sql
+|   |   |-- funcionesBluegrid.sql
+|   |   |-- vistasBluegrid.sql
+|   |
+|   |-- CodigoFuente/
+|       |-- README.md
+|       |-- run.py
+|       |-- HTTPS.md
+|       |-- docker-compose.prod.yml
+|       |-- docker-compose.azure.yml
+|       |-- docker-compose.https.yml
+|       |
+|       |-- Front/
+|       |   |-- App.tsx
+|       |   |-- index.html
+|       |   |-- index.tsx
+|       |   |-- package.json
+|       |   |-- package-lock.json
+|       |   |-- vite.config.ts
+|       |   |-- tsconfig.json
+|       |   |-- Dockerfile
+|       |   |-- nginx.conf
+|       |   |-- nginx.azure.conf
+|       |   |-- nginx.https.conf
+|       |   |-- config.template.js
+|       |   |-- public/
+|       |   |-- components/
+|       |   |-- services/
+|       |   |-- lib/
+|       |   |-- testing/
+|       |   |-- docker-entrypoint.d/
+|       |
+|       |-- Deploy/
+|       |   |-- start.py
+|       |   |-- Deploy.ipynb
+|       |   |-- backend_api/
+|       |       |-- main.py
+|       |       |-- run_server.py
+|       |       |-- requirements.txt
+|       |       |-- Dockerfile
+|       |       |-- .env.example
+|       |       |-- core/
+|       |       |-- dependencies/
+|       |       |-- routers/
+|       |       |-- services/
+|       |       |-- migrations/
+|       |       |-- sql/
+|       |
+|       |-- scripts/
+|       |-- tmp/
 ```
+
+Archivo sensible requerido para ejecutar:
+
+```txt
+Producto/CodigoFuente/Deploy/backend_api/.env
+```
+
+Ese archivo debe crearse manualmente a partir de las variables indicadas en el informe de entrega.
 
 ---
 
-## Estructura técnica del producto
-
-El código fuente principal se encuentra en:
-
-```txt
-Producto/CodigoFuente/
-```
-
-Estructura técnica esperada del producto:
-
-```txt
-Producto/CodigoFuente/
-├── run.py
-├── docker-compose.prod.yml
-│
-├── Front/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   ├── .env.example
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── App.tsx
-│   ├── types.ts
-│   ├── services/
-│   │   └── apiClient.ts
-│   └── components/
-│       ├── BluegridLogo.tsx
-│       ├── Dashboard.tsx
-│       ├── MatrixEditor.tsx
-│       ├── AdminUsersPanel.tsx
-│       ├── BuzoAnalytics.tsx
-│       ├── NotificationToast.tsx
-│       └── SettingsModal.tsx
-│
-└── Deploy/
-    ├── start.py
-    ├── Deploy.ipynb
-    └── backend_api/
-        ├── Dockerfile
-        ├── .dockerignore
-        ├── .env.example
-        ├── main.py
-        ├── requirements.txt
-        │
-        ├── core/
-        │   ├── config.py
-        │   └── logger.py
-        │
-        ├── dependencies/
-        │   └── auth.py
-        │
-        ├── migrations/
-        │   ├── 001_security_roles_admin.sql
-        │   ├── 002_audit_and_traceability.sql
-        │   ├── 003_digitalization_user_tracking.sql
-        │   └── 004_indexes.sql
-        │
-        ├── routers/
-        │   ├── auth.py
-        │   ├── users.py
-        │   ├── context.py
-        │   ├── dashboard.py
-        │   ├── operations.py
-        │   ├── supervision.py
-        │   ├── analytics.py
-        │   ├── health.py
-        │   ├── audit.py
-        │   └── training.py
-        │
-        └── services/
-            ├── db.py
-            ├── motor_ia.py
-            ├── security.py
-            └── jwt_service.py
-```
-
----
-
-## Stack tecnológico
+## Stack tecnologico
 
 ### Frontend
 
@@ -177,6 +148,7 @@ Producto/CodigoFuente/
 * TypeScript
 * Tailwind CSS
 * Lucide React
+* Nginx para despliegue containerizado
 
 ### Backend
 
@@ -189,182 +161,125 @@ Producto/CodigoFuente/
 * Python JOSE / JWT
 * Anthropic SDK
 
-### Base de datos
+### Base de datos e IA
 
-* PostgreSQL
-* Supabase como proveedor administrado recomendado
-
-### Inteligencia artificial / OCR
-
-* Claude Vision
-* Procesamiento de imagen en backend
-* Extracción de matriz estructurada
-* Corrección humana posterior a la inferencia
-
-### Despliegue
-
-* Docker
-* Docker Compose
-* Nginx para servir frontend compilado
-
----
-
-## Roles y permisos
-
-BluegridOCR contempla tres roles principales.
-
-| Rol          | Descripción                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------- |
-| `admin`      | Administrador general. Tiene acceso total al sistema.                                       |
-| `supervisor` | Usuario de supervisión. Puede digitalizar, revisar dashboard y analizar actividad por buzo. |
-| `buzo`       | Usuario operativo. Solo puede digitalizar plantillas.                                       |
-
-### Matriz de permisos
-
-| Permiso                      | Admin |                 Supervisor | Buzo |
-| ---------------------------- | ----: | -------------------------: | ---: |
-| Iniciar sesión               |    Sí |                         Sí |   Sí |
-| Digitalizar plantillas       |    Sí |                         Sí |   Sí |
-| Revisar matriz OCR           |    Sí |                         Sí |   Sí |
-| Guardar digitalización       |    Sí |                         Sí |   Sí |
-| Ver dashboard                |    Sí |                         Sí |   No |
-| Ver análisis por buzo        |    Sí |                         Sí |   No |
-| Crear usuarios               |    Sí |                         No |   No |
-| Ver administración           |    Sí |                         No |   No |
-| Gestionar configuración      |    Sí |                         No |   No |
-| Validar registros históricos |    Sí | Sí, según regla de negocio |   No |
-
-La seguridad debe aplicarse en backend mediante JWT y validación por rol. El frontend solo debe ocultar o mostrar módulos según permisos para mejorar la experiencia de usuario.
-
----
-
-## Flujo funcional del sistema
-
-El flujo principal de uso es:
-
-1. El usuario inicia sesión.
-2. El backend valida credenciales y entrega un token JWT.
-3. El frontend guarda el token y lo envía en las siguientes solicitudes.
-4. El usuario accede a los módulos permitidos según su rol.
-5. El usuario sube una imagen de plantilla o tablilla.
-6. El backend valida tipo y tamaño del archivo.
-7. El backend procesa la imagen usando Claude Vision.
-8. El sistema retorna una matriz digitalizada.
-9. El usuario revisa y corrige los datos si es necesario.
-10. El registro se guarda en PostgreSQL/Supabase.
-11. El dashboard y los módulos analíticos consumen la información almacenada.
+* PostgreSQL/Supabase
+* Claude Vision mediante API de Anthropic
 
 ---
 
 ## Variables de entorno
 
-Las credenciales reales no deben quedar hardcodeadas en el código fuente. El proyecto usa archivos `.env` locales y archivos `.env.example` para documentar la configuración requerida.
-
-### Backend
-
-Crear archivo:
+El backend carga sus variables desde:
 
 ```txt
 Producto/CodigoFuente/Deploy/backend_api/.env
 ```
 
-Contenido base:
+Por seguridad, ese archivo no se incluye en el repositorio. Para crearlo:
 
-```env
-ENVIRONMENT=development
+1. Abrir el informe de entrega.
+2. Copiar el bloque de variables de entorno indicado en el informe.
+3. Crear el archivo `.env` dentro de `Producto/CodigoFuente/Deploy/backend_api/`.
+4. Pegar las variables.
+5. Guardar el archivo.
 
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
-ANTHROPIC_API_KEY=sk-ant-...
+Existe un archivo de referencia sin secretos en:
 
-JWT_SECRET_KEY=replace_with_a_long_random_secret
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=480
-
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-
-HOST=127.0.0.1
-PORT=8000
-
-NGROK_TOKEN=
+```txt
+Producto/CodigoFuente/Deploy/backend_api/.env.example
 ```
 
-### Frontend
-
-Crear archivo:
+El frontend puede usar:
 
 ```txt
 Producto/CodigoFuente/Front/.env
 ```
 
-Contenido para desarrollo:
+Contenido recomendado para desarrollo:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
 VITE_ENABLE_MOCK_DATA=false
 ```
 
-Contenido para producción:
+El `.env` del backend debe contener, como minimo:
 
 ```env
-VITE_API_BASE_URL=https://api.tu-dominio.cl
-VITE_ENABLE_MOCK_DATA=false
+ENVIRONMENT=development
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+APP_TIMEZONE=America/Santiago
+ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_MODEL=claude-sonnet-4-6
+ANTHROPIC_OCR_AUDIT_MODEL=claude-sonnet-4-6
+JWT_SECRET_KEY=replace_with_a_long_random_secret
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3000
+HOST=127.0.0.1
+PORT=8000
+HTTPS_ENABLED=false
+NGROK_TOKEN=
 ```
 
 ---
 
-## Instalación local
+## Guia para levantar el servicio
 
-### 1. Clonar repositorio
+### 1. Entrar al codigo fuente
 
-```bash
-git clone https://github.com/ManuelADMN/BluegridOCR.git
-cd BluegridOCR
-```
+Desde la raiz del repositorio:
 
-### 2. Entrar al código fuente
-
-```bash
+```powershell
 cd Producto/CodigoFuente
 ```
 
-### 3. Instalar dependencias del backend
+### 2. Crear el `.env` del backend
 
-```bash
+Antes de instalar o ejecutar, crear:
+
+```txt
+Producto/CodigoFuente/Deploy/backend_api/.env
+```
+
+Importante: las variables reales estan dentro del informe de entrega. Deben copiarse desde ahi y pegarse en ese archivo. El `.env` debe quedar dentro de `Deploy/backend_api`, no en la raiz del repositorio.
+
+### 3. Crear el `.env` del frontend
+
+Crear:
+
+```txt
+Producto/CodigoFuente/Front/.env
+```
+
+Con este contenido:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_ENABLE_MOCK_DATA=false
+```
+
+### 4. Instalar dependencias del backend
+
+Desde `Producto/CodigoFuente`:
+
+```powershell
 pip install -r Deploy/backend_api/requirements.txt
 ```
 
-### 4. Instalar dependencias del frontend
+### 5. Instalar dependencias del frontend
 
-```bash
+```powershell
 cd Front
 npm install
 cd ..
 ```
 
-### 5. Configurar variables de entorno
+### 6. Levantar todo con el script principal
 
-Crear los archivos:
+Desde `Producto/CodigoFuente`:
 
-```txt
-Deploy/backend_api/.env
-Front/.env
-```
-
-usando como base los `.env.example` correspondientes.
-
----
-
-## Ejecución local
-
-Desde:
-
-```bash
-cd Producto/CodigoFuente
-```
-
-Ejecutar todo el sistema:
-
-```bash
+```powershell
 python run.py
 ```
 
@@ -374,384 +289,209 @@ Salida esperada:
 ============================================================
   Sistema listo
 ============================================================
-  Frontend  → http://localhost:5173
-  Backend   → http://127.0.0.1:8000
-  API docs  → http://127.0.0.1:8000/docs
+  Frontend  -> http://localhost:5173
+  Backend   -> http://127.0.0.1:8000
+  API docs  -> http://127.0.0.1:8000/docs
 ============================================================
-  Ctrl+C para detener todo
 ```
 
-### Ejecutar backend por separado
+### 7. Levantar backend y frontend por separado
 
-```bash
+Backend:
+
+```powershell
 cd Producto/CodigoFuente/Deploy/backend_api
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Ejecutar frontend por separado
+Frontend:
 
-```bash
+```powershell
 cd Producto/CodigoFuente/Front
 npm run dev
 ```
 
-Abrir:
+Abrir en el navegador:
 
 ```txt
 http://localhost:5173
 ```
 
----
-
-## Base de datos y migraciones
-
-BluegridOCR usa PostgreSQL/Supabase como base de datos principal. La conexión se configura mediante:
-
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
-```
-
-### Migraciones esperadas
-
-Ubicación:
+Si el puerto `5173` esta ocupado, Vite puede usar `5174`. En ese caso abrir:
 
 ```txt
-Producto/CodigoFuente/Deploy/backend_api/migrations/
-```
-
-| Archivo                                | Descripción                                                                     |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
-| `001_security_roles_admin.sql`         | Agrega `password_hash`, columnas de estado, roles base y usuario admin inicial. |
-| `002_audit_and_traceability.sql`       | Crea tabla de auditoría de eventos.                                             |
-| `003_digitalization_user_tracking.sql` | Agrega trazabilidad de usuario a registros OCR.                                 |
-| `004_indexes.sql`                      | Agrega índices básicos para login, auditoría y analítica.                       |
-
-### Usuario administrador inicial
-
-| Usuario | Contraseña inicial | Rol     |
-| ------- | ------------------ | ------- |
-| `admin` | `admin1234`        | `admin` |
-
-La contraseña debe almacenarse solo como hash bcrypt en la columna `password_hash`.
-
-Hash bcrypt de referencia:
-
-```txt
-$2y$12$Z/c.TZTylWpevHeETwQwRO1bsdD98FfhnONrhf0MD0mOGCyFKLMT.
-```
-
-### Verificar roles
-
-```sql
-SELECT *
-FROM roles
-WHERE LOWER(nombre_rol) IN ('admin', 'supervisor', 'buzo');
-```
-
-### Verificar usuario admin
-
-```sql
-SELECT
-    u.id_usuario,
-    u.username,
-    u.nombre_completo,
-    u.password_hash IS NOT NULL AS tiene_password_hash,
-    u.activo,
-    r.nombre_rol
-FROM usuarios u
-JOIN roles r ON r.id_rol = u.fk_rol
-WHERE u.username = 'admin';
+http://localhost:5174
 ```
 
 ---
 
-## Autenticación y seguridad
-
-BluegridOCR debe usar autenticación con JWT.
-
-### Flujo de login
-
-1. El usuario ingresa `username` y `password`.
-2. El frontend llama a `POST /api/v1/auth/login`.
-3. El backend busca el usuario en PostgreSQL.
-4. El backend valida la contraseña usando bcrypt.
-5. El backend emite un JWT.
-6. El frontend guarda el token.
-7. Las solicitudes privadas envían:
-
-```txt
-Authorization: Bearer <token>
-```
-
-### Contraseñas
-
-Las contraseñas nunca deben guardarse en texto plano. El backend debe usar:
-
-```txt
-services/security.py
-```
-
-para:
-
-* hashear contraseñas al crear usuarios;
-* verificar contraseñas al iniciar sesión.
-
-### Autorización por rol
-
-La autorización se aplica desde backend mediante:
-
-```txt
-dependencies/auth.py
-```
-
-Ejemplo:
-
-```py
-current_user: dict = Depends(require_roles(["admin", "supervisor"]))
-```
-
-Reglas principales:
-
-| Ruta                                    | Roles permitidos        |
-| --------------------------------------- | ----------------------- |
-| `POST /api/v1/registros`                | admin, supervisor, buzo |
-| `GET /api/v1/dashboard/data`            | admin, supervisor       |
-| `GET /api/v1/analytics/buzos`           | admin, supervisor       |
-| `POST /api/v1/users`                    | admin                   |
-| `PUT /api/v1/registros/{id}/validacion` | admin, supervisor       |
-| `GET /api/v1/context/zonas`             | admin, supervisor, buzo |
-
----
-
-## Endpoints principales
-
-| Método | Ruta                                | Descripción                   | Acceso                  |
-| ------ | ----------------------------------- | ----------------------------- | ----------------------- |
-| `GET`  | `/api/v1/health`                    | Estado básico de la API       | Público/interno         |
-| `GET`  | `/api/v1/ready`                     | Verifica DB, Anthropic y JWT  | Interno                 |
-| `POST` | `/api/v1/auth/login`                | Login y emisión de JWT        | Público                 |
-| `POST` | `/api/v1/users`                     | Crear usuario                 | admin                   |
-| `GET`  | `/api/v1/users`                     | Listar usuarios               | admin                   |
-| `POST` | `/api/v1/registros`                 | Subir imagen y procesar OCR   | admin, supervisor, buzo |
-| `PUT`  | `/api/v1/registros/{id}/validacion` | Validar registro digitalizado | admin, supervisor       |
-| `GET`  | `/api/v1/dashboard/data`            | Datos del dashboard           | admin, supervisor       |
-| `GET`  | `/api/v1/context/zonas`             | Zonas o sectores disponibles  | admin, supervisor, buzo |
-| `GET`  | `/api/v1/analytics/buzos`           | Métricas agrupadas por buzo   | admin, supervisor       |
-| `POST` | `/api/v1/training/feedback`         | Enviar correcciones a dataset | admin, supervisor       |
-
-Documentación interactiva en desarrollo:
-
-```txt
-http://localhost:8000/docs
-```
-
-En producción, `/docs` y `/redoc` deben desactivarse usando:
-
-```env
-ENVIRONMENT=production
-```
-
----
-
-## Deploy con Docker
+## Ejecucion con Docker
 
 Desde:
 
-```bash
+```powershell
 cd Producto/CodigoFuente
 ```
 
-levantar el stack:
+Levantar el stack:
 
-```bash
+```powershell
 docker compose -f docker-compose.prod.yml up --build
 ```
 
 Servicios esperados:
 
-| Servicio            |  Puerto | Descripción                       |
-| ------------------- | ------: | --------------------------------- |
-| Frontend            |  `3000` | React compilado servido por Nginx |
-| Backend             |  `8000` | API FastAPI                       |
-| PostgreSQL/Supabase | Externo | Base administrada                 |
+| Servicio | Puerto | Descripcion |
+| -------- | -----: | ----------- |
+| Frontend | `3000` | React compilado servido por Nginx |
+| Backend | `8000` | API FastAPI |
+| PostgreSQL/Supabase | Externo | Base administrada |
 
-Abrir frontend:
+Abrir:
 
 ```txt
 http://localhost:3000
 ```
 
-API backend:
+Importante para Docker: el compose productivo tambien usa el archivo:
 
 ```txt
-http://localhost:8000
+Producto/CodigoFuente/Deploy/backend_api/.env
 ```
 
-Health check:
+---
+
+## Endpoints de verificacion
+
+Con el backend arriba:
 
 ```txt
-http://localhost:8000/api/v1/health
+http://127.0.0.1:8000/api/v1/health
+http://127.0.0.1:8000/api/v1/ready
+http://127.0.0.1:8000/docs
 ```
 
-Readiness check:
+`/api/v1/ready` debe confirmar:
 
 ```txt
-http://localhost:8000/api/v1/ready
+database=true
+anthropic_key=true
+jwt_secret=true
 ```
+
+Si alguno falla, revisar primero que el `.env` exista en `Producto/CodigoFuente/Deploy/backend_api/.env` y que las variables se hayan copiado correctamente desde el informe.
+
+---
+
+## Roles y permisos
+
+| Rol | Descripcion |
+| --- | ----------- |
+| `admin` | Administrador general. Puede acceder a todos los modulos. |
+| `supervisor` | Usuario de supervision. Puede digitalizar, ver dashboard y analizar actividad por buzo. |
+| `buzo` | Usuario operativo. Solo puede digitalizar plantillas. |
+
+| Permiso | Admin | Supervisor | Buzo |
+| ------- | :---: | :--------: | :--: |
+| Iniciar sesion | Si | Si | Si |
+| Digitalizar plantillas | Si | Si | Si |
+| Revisar matriz OCR | Si | Si | Si |
+| Guardar digitalizacion | Si | Si | Si |
+| Ver dashboard | Si | Si | No |
+| Ver analisis por buzo | Si | Si | No |
+| Crear usuarios | Si | No | No |
+| Gestionar configuracion | Si | No | No |
+
+La seguridad real se aplica en backend mediante JWT y validacion por rol.
+
+---
+
+## Base de datos y migraciones
+
+La conexion a PostgreSQL/Supabase se define en `DATABASE_URL` dentro de:
+
+```txt
+Producto/CodigoFuente/Deploy/backend_api/.env
+```
+
+Migraciones:
+
+```txt
+Producto/CodigoFuente/Deploy/backend_api/migrations/
+```
+
+Scripts SQL complementarios:
+
+```txt
+Producto/Scripts_BD/
+Producto/CodigoFuente/Deploy/backend_api/sql/
+```
+
+Usuario administrador inicial esperado:
+
+| Usuario | Contrasena inicial | Rol |
+| ------- | ------------------ | --- |
+| `admin` | `admin1234` | `admin` |
+
+Se recomienda cambiar la contrasena inicial despues del primer inicio de sesion.
 
 ---
 
 ## Pruebas recomendadas
 
-### Frontend
+Backend:
 
-```bash
-cd Producto/CodigoFuente/Front
-npm run build
-```
-
-### Backend
-
-```bash
+```powershell
 cd Producto/CodigoFuente/Deploy/backend_api
 python -m py_compile main.py
 ```
 
-### Docker
+Frontend:
 
-```bash
-cd Producto/CodigoFuente
-docker compose -f docker-compose.prod.yml up --build
+```powershell
+cd Producto/CodigoFuente/Front
+npm run build
 ```
 
-### Pruebas funcionales mínimas
+Checks funcionales minimos:
 
 ```txt
 [ ] /api/v1/health responde correctamente.
 [ ] /api/v1/ready valida DB, Anthropic y JWT.
 [ ] Login admin funciona con JWT.
 [ ] Buzo puede digitalizar.
-[ ] Buzo no puede ver dashboard.
-[ ] Buzo no puede ver análisis por buzo.
 [ ] Supervisor puede ver dashboard.
-[ ] Supervisor no puede crear usuarios.
 [ ] Admin puede crear usuarios.
-[ ] OCR procesa una imagen válida.
+[ ] OCR procesa una imagen valida.
 [ ] El backend rechaza archivos no permitidos.
-[ ] El dashboard no usa datos mock en producción.
 ```
 
 ---
 
-## Contenido por carpeta
-
-### Documentacion
-
-Carpeta destinada a documentación formal del proyecto.
-
-```txt
-Documentacion/
-├── Informe/
-├── UML/
-├── Wireframe/
-├── MER/
-└── Gantt/
-```
-
-Contenido esperado:
-
-* Informe del proyecto.
-* Diagramas UML.
-* Wireframes.
-* Modelo Entidad Relación.
-* Carta Gantt.
-* Otros documentos de análisis, diseño o QA.
-
-### Producto
-
-Carpeta destinada a los entregables técnicos.
-
-```txt
-Producto/
-├── CodigoFuente/
-├── Scripts_BD/
-├── Librerias/
-└── Datos_Prueba/
-```
-
-Contenido esperado:
-
-* Código fuente.
-* Scripts SQL.
-* Librerías o referencias técnicas.
-* Datos de prueba.
-
-### Gestion
-
-Carpeta destinada a documentos administrativos.
-
-```txt
-Gestion/
-├── Integrantes.txt
-└── README_Gestion.md
-```
-
-Contenido esperado:
-
-* Documento de registro de definición e identificación del proyecto.
-* Archivo de integrantes.
-* Documentación administrativa complementaria.
-
----
-
-## Buenas prácticas operativas
-
-### Seguridad
+## Buenas practicas operativas
 
 * No subir `.env` al repositorio.
 * Subir solo `.env.example`.
 * Rotar credenciales expuestas o compartidas.
 * Usar `JWT_SECRET_KEY` largo y aleatorio.
-* Restringir `ALLOWED_ORIGINS` en producción.
-* Desactivar Swagger en producción.
-* No guardar contraseñas en texto plano.
+* Restringir `ALLOWED_ORIGINS` en produccion.
+* Desactivar Swagger en produccion.
+* No guardar contrasenas en texto plano.
 * No confiar en roles enviados desde frontend.
-
-### Validación de archivos OCR
-
-El backend debe rechazar archivos inválidos antes de llamar al motor IA.
-
-Parámetros recomendados:
-
-```txt
-Tipos permitidos: image/jpeg, image/png, image/webp
-Tamaño máximo: 8 MB
-```
-
-### Observabilidad
-
-Registrar eventos críticos:
-
-| Evento             | Descripción                    |
-| ------------------ | ------------------------------ |
-| `login_success`    | Inicio de sesión exitoso       |
-| `login_failed`     | Inicio de sesión fallido       |
-| `user_created`     | Usuario creado por admin       |
-| `ocr_processed`    | Imagen procesada correctamente |
-| `matrix_corrected` | Matriz corregida por usuario   |
-| `record_validated` | Registro validado              |
-| `access_denied`    | Intento de acceso no permitido |
-| `claude_error`     | Error del proveedor IA         |
-| `db_error`         | Error de base de datos         |
 
 ---
 
-## Estado del proyecto
+## Recordatorio final sobre el `.env`
 
-BluegridOCR debe mantenerse bajo la siguiente regla:
+Antes de entregar, ejecutar o evaluar el proyecto, confirmar nuevamente este punto:
 
 ```txt
-MVP funcional + seguridad base + despliegue reproducible
+El archivo .env real NO esta versionado por seguridad.
+Las variables reales estan dentro del informe de entrega.
+El archivo debe crearse manualmente en:
+
+Producto/CodigoFuente/Deploy/backend_api/.env
 ```
 
-El foco principal no es solo digitalizar imágenes, sino asegurar trazabilidad, control de acceso, estabilidad operativa y una base preparada para escalar hacia más analítica, auditoría y entrenamiento asistido por correcciones humanas.
+Si el `.env` se crea en otra carpeta, el backend no cargara las variables necesarias. La ubicacion correcta es la carpeta `Deploy/backend_api` del codigo fuente.
+
