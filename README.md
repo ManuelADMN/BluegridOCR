@@ -31,6 +31,7 @@ BluegridOCR es un sistema web para digitalizar planillas acuicolas mediante visi
 * [Roles y permisos](#roles-y-permisos)
 * [Base de datos y migraciones](#base-de-datos-y-migraciones)
 * [Pruebas recomendadas](#pruebas-recomendadas)
+* [Evidencias Testing](#evidencias-testing)
 * [Recordatorio final sobre el .env](#recordatorio-final-sobre-el-env)
 
 ---
@@ -468,6 +469,113 @@ Checks funcionales minimos:
 
 ---
 
+## Evidencias Testing
+
+La carpeta de evidencias tecnicas del proyecto se encuentra en:
+
+```txt
+Evidencias_Prueba/
+```
+
+Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la entrega. Su objetivo es dejar respaldo verificable de que el sistema levanta, responde, valida configuracion critica, compila, construye el frontend y protege rutas privadas.
+
+### Estructura de Evidencias_Testing
+
+```txt
+Evidencias_Prueba/
+|-- README_EVIDENCIAS.md
+|
+|-- txt/
+|   |-- 00_contexto_ejecucion.txt
+|   |-- 01_backend_health.txt
+|   |-- 02_backend_ready_db_ia_jwt.txt
+|   |-- 03_frontend_http_status.txt
+|   |-- 04_api_docs_status.txt
+|   |-- 05_openapi_endpoints.txt
+|   |-- 06_backend_py_compile.txt
+|   |-- 07_login_admin_default.txt
+|   |-- 08_frontend_build.txt
+|   |-- 09_rotacion_imagen_muestra.txt
+|   |-- 10_backend_logs_tail.txt
+|   |-- 11_dashboard_data_response.txt
+|
+|-- imagenes/
+|   |-- 01_muestra_ocr_original.jpg
+|   |-- 02_muestra_ocr_warped.png
+|   |-- 03_muestra_ocr_grid_preview.png
+|   |-- 04_muestra_ocr_contact_sheet_count.png
+|   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
+|
+|-- scripts/
+|   |-- rotar_tablilla.py
+```
+
+### Contenido de cada prueba
+
+| Archivo | Que valida | Resultado esperado |
+| --- | --- | --- |
+| `README_EVIDENCIAS.md` | Resumen formal de evidencias, interpretacion de resultados y checklist de entrega. | Documento de apoyo para revision. |
+| `txt/00_contexto_ejecucion.txt` | Fecha, ruta del proyecto y versiones usadas de Python, Node y npm. | Contexto reproducible de ejecucion. |
+| `txt/01_backend_health.txt` | Respuesta de `GET /api/v1/health`. | Backend activo con `status=ok`. |
+| `txt/02_backend_ready_db_ia_jwt.txt` | Respuesta de `GET /api/v1/ready`. | `database=true`, `anthropic_key=true`, `jwt_secret=true`. |
+| `txt/03_frontend_http_status.txt` | Respuesta HTTP del frontend local. | `StatusCode=200`. |
+| `txt/04_api_docs_status.txt` | Disponibilidad de Swagger/FastAPI docs. | `StatusCode=200` en `/docs`. |
+| `txt/05_openapi_endpoints.txt` | Publicacion de endpoints desde `openapi.json`. | Listado de endpoints disponibles. |
+| `txt/06_backend_py_compile.txt` | Compilacion sintactica del backend. | `main.py` compila correctamente. |
+| `txt/07_login_admin_default.txt` | Comportamiento del login con credenciales documentadas. | El backend responde y valida; la base actual rechaza `admin/admin1234`. |
+| `txt/08_frontend_build.txt` | Build productivo del frontend. | `ExitCode=0`. |
+| `txt/09_rotacion_imagen_muestra.txt` | Rotacion de una imagen de muestra con Pillow. | Imagen rotada generada correctamente. |
+| `txt/10_backend_logs_tail.txt` | Logs recientes del backend durante las pruebas. | Peticiones reales registradas. |
+| `txt/11_dashboard_data_response.txt` | Acceso a ruta protegida sin token. | `401 Unauthorized`. |
+
+### Evidencias visuales
+
+| Archivo | Que contiene |
+| --- | --- |
+| `imagenes/01_muestra_ocr_original.jpg` | Imagen original usada como muestra del flujo OCR/debug. |
+| `imagenes/02_muestra_ocr_warped.png` | Imagen rectificada o preprocesada. |
+| `imagenes/03_muestra_ocr_grid_preview.png` | Vista previa de grilla detectada. |
+| `imagenes/04_muestra_ocr_contact_sheet_count.png` | Hoja de contacto para auditoria visual de conteo/debug. |
+| `imagenes/05_muestra_ocr_original_rotada_90_clockwise.jpg` | Evidencia de rotacion generada por script. |
+
+### Script de apoyo
+
+El script:
+
+```txt
+Evidencias_Prueba/scripts/rotar_tablilla.py
+```
+
+permite rotar una imagen de tablilla y generar una version corregida para adjuntarla como evidencia visual:
+
+```powershell
+python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
+```
+
+Si la orientacion correcta queda hacia el otro lado:
+
+```powershell
+python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
+```
+
+### Estado de cierre de evidencias
+
+```txt
+[x] Backend responde.
+[x] Frontend responde.
+[x] Base de datos, Anthropic y JWT estan configurados.
+[x] Swagger y OpenAPI estan disponibles.
+[x] Backend compila.
+[x] Frontend genera build productivo.
+[x] Rutas protegidas rechazan acceso sin token.
+[x] Evidencias visuales OCR/debug incluidas.
+[x] Script de rotacion incluido.
+[ ] Falta adjuntar la imagen exacta de tablilla compartida por el usuario como archivo local.
+[ ] Falta ejecutar OCR completo con usuario valido y token vigente.
+```
+
+---
+
 ## Buenas practicas operativas
 
 * No subir `.env` al repositorio.
@@ -494,4 +602,3 @@ Producto/CodigoFuente/Deploy/backend_api/.env
 ```
 
 Si el `.env` se crea en otra carpeta, el backend no cargara las variables necesarias. La ubicacion correcta es la carpeta `Deploy/backend_api` del codigo fuente.
-
