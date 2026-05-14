@@ -568,6 +568,49 @@ Readiness check:
 http://localhost:8000/api/v1/ready
 ```
 
+### Preparación para Azure Docker
+
+El despliegue en Azure queda soportado con:
+
+| Archivo | Uso |
+| ------- | --- |
+| `docker-compose.azure.yml` | Compose para Azure con frontend público y backend interno. |
+| `Front/nginx.azure.conf` | Nginx sirve React y reenvía `/api/*` al contenedor `backend`. |
+| `Front/config.template.js` | Configuración runtime del frontend sin reconstruir la imagen. |
+| `Front/docker-entrypoint.d/40-bluegrid-runtime-config.sh` | Genera `config.js` al iniciar el contenedor. |
+
+Flujo recomendado:
+
+```bash
+docker build -t <acr>.azurecr.io/bluegridocr-backend:latest ./Deploy/backend_api
+docker build -t <acr>.azurecr.io/bluegridocr-frontend:latest ./Front
+
+docker push <acr>.azurecr.io/bluegridocr-backend:latest
+docker push <acr>.azurecr.io/bluegridocr-frontend:latest
+```
+
+Variables mínimas para Azure:
+
+```env
+AZURE_BACKEND_IMAGE=<acr>.azurecr.io/bluegridocr-backend:latest
+AZURE_FRONTEND_IMAGE=<acr>.azurecr.io/bluegridocr-frontend:latest
+
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+ANTHROPIC_API_KEY=sk-ant-...
+JWT_SECRET_KEY=replace_with_a_long_random_secret
+ALLOWED_ORIGINS=https://tu-app.azurewebsites.net
+```
+
+En `docker-compose.azure.yml`, el frontend usa `API_BASE_URL=""` y `ENABLE_INTERNAL_API_PROXY=true`, por lo que el navegador llama a la API por la misma URL pública usando `/api/*`. Azure termina HTTPS en la plataforma, por eso los contenedores quedan en HTTP interno con `HTTPS_ENABLED=false`.
+
+Checks útiles en Azure:
+
+```txt
+https://tu-app.azurewebsites.net/healthz
+https://tu-app.azurewebsites.net/api/v1/health
+https://tu-app.azurewebsites.net/api/v1/ready
+```
+
 ### Backend Dockerfile
 
 Ubicación:
@@ -601,6 +644,52 @@ docker-compose.prod.yml
 ```bash
 cd Front
 npm run build
+```
+
+### Testing frontend con Jasmine y Karma
+
+El frontend mantiene el testing separado del codigo de aplicacion en `Front/testing/`. La suite usa Jasmine + Karma en navegador. La configuracion esta en:
+
+```txt
+Front/testing/karma.conf.cjs
+```
+
+Los specs estan en:
+
+```txt
+Front/testing/specs/
+```
+
+Cobertura actual:
+
+* `services/apiClient.ts`: lectura y limpieza del token, preservacion de opciones de `fetch`, header `Authorization` y header `ngrok-skip-browser-warning`.
+* `types.ts`: permisos por rol (`admin`, `supervisor`, `buzo`), restricciones de permisos administrativos, zonas iniciales y contrato inicial del dashboard (`context`, `summary`, `kpis`, `barData`, `lineData`, `mapData`).
+
+Desde Windows/PowerShell se recomienda usar `npm.cmd` para evitar bloqueos de `npm.ps1` por Execution Policy:
+
+```powershell
+cd "C:\Users\madzm\OneDrive\Desktop\Proyectos\Denoise\BluegridOCRDUOC\BluegridOCR\Front"
+npm.cmd install
+npm.cmd run test:karma
+```
+
+Comandos equivalentes desde `Front/`:
+
+```powershell
+npm.cmd test
+npm.cmd run test:karma
+```
+
+Modo observador durante desarrollo:
+
+```powershell
+npm.cmd run test:karma:watch
+```
+
+Ejecucion validada:
+
+```txt
+TOTAL: 21 SUCCESS
 ```
 
 ### Backend
@@ -717,6 +806,20 @@ Build frontend:
 ```bash
 cd Front
 npm run build
+```
+
+Testing frontend:
+
+```bash
+cd Front
+npm run test:karma
+```
+
+Testing frontend en PowerShell/Windows:
+
+```powershell
+cd Front
+npm.cmd run test:karma
 ```
 
 Ejecutar con Docker:

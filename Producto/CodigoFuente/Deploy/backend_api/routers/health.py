@@ -32,5 +32,6 @@ def ready():
 
     return {
         "status": "ready" if all(checks.values()) else "not_ready",
-        "checks": checks
+        "checks": checks,
+        "anthropic_model": settings.ANTHROPIC_MODEL
     }

@@ -3,10 +3,11 @@ import {
   Users, UserPlus, Trash2, Shield, User, Loader2, 
   AlertCircle, CheckCircle2, X, Mail, Fingerprint, 
   Anchor, Clipboard, KeyRound, Search, Filter,
-  Ship, Info
+  Ship, Info, PlusCircle
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { authFetch } from '../services/apiClient';
+import { SelectControl } from './ui/form-controls';
 
 interface BackendUser {
   id_usuario: number;
@@ -24,6 +25,8 @@ interface Embarcacion {
   id: number;
   name: string;
   matricula: string;
+  capacidad_personas?: number;
+  estado?: string;
 }
 
 interface UserManagementProps {
@@ -37,6 +40,7 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAddingBoat, setIsAddingBoat] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -48,6 +52,9 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
   const [newRole, setNewRole] = useState<number>(3); // Default to buzo
   const [newEmbarcacion, setNewEmbarcacion] = useState<number | ''>('');
   const [newTablilla, setNewTablilla] = useState('');
+  const [newBoatMatricula, setNewBoatMatricula] = useState('');
+  const [newBoatName, setNewBoatName] = useState('');
+  const [newBoatCapacity, setNewBoatCapacity] = useState(0);
 
   const fetchUsers = async (silent = false) => {
     if (!silent) setIsLoading(true);
@@ -62,7 +69,7 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
       if (!uRes.ok) throw new Error('No se pudieron cargar los usuarios');
       
       const uData = await uRes.json();
-      setUsers(Array.isArray(uData) ? uData : []);
+      setUsers(Array.isArray(uData) ? uData : (uData.items || []));
 
       if (eRes.ok) {
         const eData = await eRes.json();
@@ -73,6 +80,39 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const handleAddBoat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    try {
+      const response = await authFetch(`${apiUrl}/api/v1/context/embarcaciones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matricula: newBoatMatricula,
+          nombre_nave: newBoatName,
+          capacidad_personas: Number(newBoatCapacity) || 0,
+          estado: 'ACTIVA',
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Error al crear embarcacion');
+      }
+
+      const created = await response.json();
+      setNewBoatMatricula('');
+      setNewBoatName('');
+      setNewBoatCapacity(0);
+      setIsAddingBoat(false);
+      setNewEmbarcacion(created.id);
+      fetchUsers(true);
+    } catch (err: any) {
+      setError(err.message);
     }
   };
 
@@ -185,6 +225,12 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
               className="pl-10 pr-4 h-11 w-64 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-all"
             />
           </div>
+          <button
+            onClick={() => setIsAddingBoat(true)}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-zinc-900 text-black dark:text-white border border-zinc-200 dark:border-zinc-800 px-5 h-11 rounded-xl font-bold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all active:scale-95 whitespace-nowrap"
+          >
+            <PlusCircle className="w-4 h-4" /> EMBARCACION
+          </button>
           <button
             onClick={() => setIsAdding(true)}
             className="flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black px-6 h-11 rounded-xl font-bold text-sm hover:opacity-90 transition-all shadow-lg active:scale-95 whitespace-nowrap"
@@ -371,15 +417,16 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
                       <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Rol Operativo</label>
                       <div className="relative">
                         <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                        <select
-                          value={newRole}
-                          onChange={e => setNewRole(Number(e.target.value))}
-                          className="w-full h-12 pl-12 pr-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-black dark:focus:border-white transition-all font-bold appearance-none"
-                        >
-                          <option value={1}>Administrador</option>
-                          <option value={2}>Supervisor</option>
-                          <option value={3}>Buzo (Operador)</option>
-                        </select>
+                        <SelectControl
+                          value={String(newRole)}
+                          onChange={value => setNewRole(Number(value))}
+                          options={[
+                            { value: '1', label: 'Administrador' },
+                            { value: '2', label: 'Supervisor' },
+                            { value: '3', label: 'Buzo (operador)' },
+                          ]}
+                          buttonClassName="h-12 rounded-2xl bg-zinc-50 pl-12 font-bold dark:bg-zinc-900"
+                        />
                       </div>
                     </div>
 
@@ -388,17 +435,15 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
                       <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
                         <div className="space-y-2">
                           <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest px-1">Barco</label>
-                          <select
-                            required
-                            value={newEmbarcacion}
-                            onChange={e => setNewEmbarcacion(Number(e.target.value))}
-                            className="w-full h-12 px-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-2xl text-xs font-bold focus:outline-none focus:border-blue-500 transition-all"
-                          >
-                            <option value="">Seleccionar...</option>
-                            {embarcaciones.map(e => (
-                              <option key={e.id} value={e.id}>{e.name}</option>
-                            ))}
-                          </select>
+                          <SelectControl
+                            value={newEmbarcacion ? String(newEmbarcacion) : ''}
+                            onChange={value => setNewEmbarcacion(Number(value))}
+                            options={[
+                              { value: '', label: 'Seleccionar...' },
+                              ...embarcaciones.map(e => ({ value: String(e.id), label: e.name })),
+                            ]}
+                            buttonClassName="h-12 rounded-2xl border-blue-200 bg-blue-50 text-xs font-bold dark:border-blue-900/30 dark:bg-blue-900/10"
+                          />
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest px-1">ID Tablilla</label>
@@ -428,6 +473,83 @@ export default function UserManagement({ apiUrl, requesterRole }: UserManagement
                     className="flex-[2] h-14 bg-black dark:bg-white text-white dark:text-black font-black rounded-2xl hover:opacity-90 transition-all text-xs tracking-[0.2em] shadow-xl shadow-black/10 dark:shadow-white/5 active:scale-[0.98]"
                   >
                     CREAR USUARIO
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAddingBoat && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-[#0a0a0a] w-full max-w-lg rounded-[2rem] shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black tracking-tighter text-black dark:text-white">Registrar Embarcacion</h3>
+                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Disponible para asignar a buzos</p>
+                </div>
+                <button onClick={() => setIsAddingBoat(false)} className="p-3 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddBoat} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Matricula</label>
+                  <div className="relative">
+                    <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                      required
+                      type="text"
+                      value={newBoatMatricula}
+                      onChange={e => setNewBoatMatricula(e.target.value)}
+                      placeholder="Ej: PM-3056"
+                      className="w-full h-12 pl-12 pr-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-black dark:focus:border-white transition-all font-medium uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Nombre Nave</label>
+                  <div className="relative">
+                    <Ship className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                      required
+                      type="text"
+                      value={newBoatName}
+                      onChange={e => setNewBoatName(e.target.value)}
+                      placeholder="Nombre de la embarcacion"
+                      className="w-full h-12 pl-12 pr-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-black dark:focus:border-white transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Capacidad</label>
+                  <input
+                    min={0}
+                    type="number"
+                    value={newBoatCapacity}
+                    onChange={e => setNewBoatCapacity(Number(e.target.value))}
+                    className="w-full h-12 px-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm focus:outline-none focus:border-black dark:focus:border-white transition-all font-medium"
+                  />
+                </div>
+
+                <div className="pt-4 flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingBoat(false)}
+                    className="flex-1 h-12 bg-zinc-100 dark:bg-zinc-900 text-black dark:text-white font-bold rounded-2xl hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all text-xs tracking-widest"
+                  >
+                    CANCELAR
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-[2] h-12 bg-black dark:bg-white text-white dark:text-black font-black rounded-2xl hover:opacity-90 transition-all text-xs tracking-[0.2em]"
+                  >
+                    CREAR EMBARCACION
                   </button>
                 </div>
               </form>

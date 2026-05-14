@@ -20,6 +20,9 @@ PORT      = 8000
 load_dotenv(API_DIR / ".env")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 NGROK_TOKEN       = os.environ.get("NGROK_TOKEN", "")
+HTTPS_ENABLED     = os.environ.get("HTTPS_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+SSL_CERTFILE      = os.environ.get("SSL_CERTFILE", "")
+SSL_KEYFILE       = os.environ.get("SSL_KEYFILE", "")
 
 # ── Validar credenciales ──────────────────────────────────────────────────────
 print("=" * 60)
@@ -70,10 +73,24 @@ def stream(proc, prefix):
 # ── Arrancar Backend ──────────────────────────────────────────────────────────
 print("\n⏳ Arrancando backend...")
 env_back = {**os.environ, "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY}
+scheme = "https" if HTTPS_ENABLED else "http"
+backend_cmd = [
+    sys.executable, "-m", "uvicorn", "main:app",
+    "--host", HOST, "--port", str(PORT), "--reload"
+]
+cert_path = None
+key_path = None
+
+if HTTPS_ENABLED:
+    cert_path = (API_DIR / SSL_CERTFILE).resolve() if SSL_CERTFILE and not Path(SSL_CERTFILE).is_absolute() else Path(SSL_CERTFILE)
+    key_path = (API_DIR / SSL_KEYFILE).resolve() if SSL_KEYFILE and not Path(SSL_KEYFILE).is_absolute() else Path(SSL_KEYFILE)
+    if not cert_path.exists() or not key_path.exists():
+        print("❌ HTTPS_ENABLED=true pero no existen SSL_CERTFILE/SSL_KEYFILE.")
+        sys.exit(1)
+    backend_cmd.extend(["--ssl-certfile", str(cert_path), "--ssl-keyfile", str(key_path)])
 
 backend = subprocess.Popen(
-    [sys.executable, "-m", "uvicorn", "main:app",
-     "--host", HOST, "--port", str(PORT), "--reload"],
+    backend_cmd,
     cwd=str(API_DIR),
     env=env_back,
     stdout=subprocess.PIPE,
@@ -90,7 +107,7 @@ for _ in range(60):
         print("❌ Backend cerró inesperadamente.")
         sys.exit(1)
     try:
-        if requests.get(f"http://{HOST}:{PORT}/", timeout=2).status_code < 500:
+        if requests.get(f"{scheme}://{HOST}:{PORT}/", timeout=2, verify=False).status_code < 500:
             ready = True
             break
     except Exception:
@@ -101,7 +118,7 @@ if not ready:
     print("❌ Timeout: el backend no respondió.")
     backend.terminate()
     sys.exit(1)
-print(f"✅ Backend listo en http://{HOST}:{PORT}")
+print(f"✅ Backend listo en {scheme}://{HOST}:{PORT}")
 
 # ── Ngrok (opcional) ──────────────────────────────────────────────────────────
 public_url = None
@@ -126,6 +143,13 @@ print("\n⏳ Arrancando frontend...")
 frontend = subprocess.Popen(
     ["npm", "run", "dev"],
     cwd=str(FRONT_DIR),
+    env={
+        **os.environ,
+        "VITE_API_BASE_URL": public_url or f"{scheme}://localhost:{PORT}",
+        "VITE_HTTPS": "true" if HTTPS_ENABLED else "false",
+        "VITE_SSL_CERTFILE": str(cert_path) if HTTPS_ENABLED and cert_path else "",
+        "VITE_SSL_KEYFILE": str(key_path) if HTTPS_ENABLED and key_path else "",
+    },
     stdout=subprocess.PIPE,
     stderr=subprocess.STDOUT,
     text=True,
@@ -142,10 +166,10 @@ print("\n" + "=" * 60)
 print("  Sistema listo")
 print("=" * 60)
 print(f"  Frontend  → {front_url or 'http://localhost:5173'}")
-print(f"  Backend   → http://{HOST}:{PORT}")
+print(f"  Backend   → {scheme}://{HOST}:{PORT}")
 if public_url:
     print(f"  Ngrok     → {public_url}")
-print(f"  API docs  → http://{HOST}:{PORT}/docs")
+print(f"  API docs  → {scheme}://{HOST}:{PORT}/docs")
 print("=" * 60)
 print("  Ctrl+C para detener todo\n")
 

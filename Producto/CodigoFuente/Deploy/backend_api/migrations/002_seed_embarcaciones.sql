@@ -3,7 +3,7 @@
 -- =========================================================
 
 -- Insertar embarcaciones base si no existen
-INSERT INTO embarcaciones (id_embarcacion, matricula, nombre_embarcacion)
+INSERT INTO embarcaciones (id_embarcacion, matricula, nombre_nave)
 VALUES 
     (1, 'CB-1001', 'El Poseidón'),
     (2, 'VAL-2040', 'Mar del Sur'),
@@ -17,7 +17,7 @@ VALUES
     (10, 'BUP-9999', 'Bluegrid Test')
 ON CONFLICT (id_embarcacion) DO UPDATE 
 SET matricula = EXCLUDED.matricula, 
-    nombre_embarcacion = EXCLUDED.nombre_embarcacion;
+    nombre_nave = EXCLUDED.nombre_nave;
 
 -- Reiniciar secuencia si es necesario (PostgreSQL)
 SELECT setval('embarcaciones_id_embarcacion_seq', (SELECT MAX(id_embarcacion) FROM embarcaciones));

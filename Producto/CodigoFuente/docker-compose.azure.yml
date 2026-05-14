@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ${AZURE_BACKEND_IMAGE}
+    container_name: bluegridocr_backend
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: "production"
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      HTTPS_ENABLED: "false"
+      DATABASE_URL: ${DATABASE_URL}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Santiago}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      ANTHROPIC_OCR_AUDIT_MODEL: ${ANTHROPIC_OCR_AUDIT_MODEL:-claude-opus-4-1-20250805}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    expose:
+      - "8000"
+
+  frontend:
+    image: ${AZURE_FRONTEND_IMAGE}
+    container_name: bluegridocr_frontend
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: ""
+      ENABLE_INTERNAL_API_PROXY: "true"
+      WEBSITES_PORT: "80"
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

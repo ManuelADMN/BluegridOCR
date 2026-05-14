@@ -51,19 +51,34 @@ export interface User {
 }
 
 export interface MatrixCell {
-  fila: string | number; // Backend now sends "Fila 1", but we support number for legacy/internal use
+  fila: string | number;
   col: number;
   valor: string;
   confianza: number;
-  // New fields for Human-in-the-Loop training
-  ref_id?: string;     // Unique ID from backend (e.g., "R0_C1") to map specific cropped files
-  recorte_base64?: string; // Legacy: Base64 image crop
-  valor_original?: string; // To store the initial prediction if needed explicitly
+  ref_id?: string;
+  recorte_base64?: string; // alias del campo recorte_b64 que devuelve el backend
+  recorte_b64?: string;    // campo que devuelve el backend (motor_ia)
+  valor_original?: string;
 }
 
 export interface IA_Result {
   status: string; // 'procesado_ia_tablilla' | 'simulacion' | 'error'
   promedio_confianza: number;
+  tablilla_id?: string | null;
+  tablilla_id_raw?: string | null;
+  tablilla_detectada?: {
+    tablilla_id_normalizado?: string | null;
+    tablilla_encontrada: boolean;
+    tablilla?: {
+      id: number;
+      codigo: string;
+    } | null;
+    embarcacion?: {
+      id: number;
+      nombre: string;
+      matricula: string;
+    } | null;
+  };
   matriz: MatrixCell[];
 }
 
@@ -102,11 +117,26 @@ export interface BackendKPI {
   label: string;
   value: number;
   unit: string;
+  description?: string;
+  current_period_value?: number;
+  previous_period_value?: number;
+  trend_pct?: number | null;
+  series?: BackendSeriesData[];
 }
 
 export interface BackendChartData {
   name: string;
   value: number;
+  date?: string;
+  registros?: number;
+}
+
+export interface BackendSeriesData {
+  name: string;
+  current: number;
+  previous: number;
+  current_date: string;
+  previous_date: string;
 }
 
 export interface BackendMapData {
@@ -120,14 +150,64 @@ export interface BackendMapData {
 }
 
 export interface DashboardResponse {
+  context?: {
+    latest_day: string;
+    current_period: {
+      start: string;
+      end: string;
+      label: string;
+    };
+    previous_period: {
+      start: string;
+      end: string;
+      label: string;
+    };
+  };
+  summary?: {
+    nidos: number;
+    cuevas_cubiertas: number;
+    hembras_con_huevos: number;
+    registros: number;
+    registros_validados: number;
+    registros_pendientes?: number;
+    registros_rechazados?: number;
+    sectores?: number;
+    buzos?: number;
+    promedio_confianza_ocr?: number;
+    ocupacion_pct: number;
+    tasa_reproductiva_pct: number;
+    eficiencia_validacion_pct: number;
+  };
   kpis: BackendKPI[];
   barData: BackendChartData[];
   lineData: BackendChartData[];
   mapData: BackendMapData[];
+  recentRecords?: ReportRecord[];
+  pendingRecords?: ReportRecord[];
+}
+
+export interface ReportRecord {
+  id_registro: number;
+  fecha_carga: string;
+  estado_validacion: string;
+  promedio_confianza: number;
+  url_imagen_original?: string;
+  sector: string;
+  region: string;
+  usuario_id?: number;
+  tipo_usuario?: string;
+  usuario?: string;
+  buzo?: string;
+  nidos?: number;
+  cuevas_cubiertas?: number;
+  hembras?: number;
+  total_pulpos?: number;
 }
 
 // Helper for initial state to avoid null checks everywhere before load
 export const INITIAL_DASHBOARD_STATE: DashboardResponse = {
+  context: undefined,
+  summary: undefined,
   kpis: [],
   barData: [],
   lineData: [],

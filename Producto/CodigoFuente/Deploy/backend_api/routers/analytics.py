@@ -20,42 +20,42 @@ def get_buzo_analytics(
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        filters = []
+        filters = ["UPPER(COALESCE(r.estado_validacion, '')) <> 'ELIMINADO'"]
         params = []
 
         if fecha_desde:
-            filters.append("r.created_at >= %s")
+            filters.append("DATE(r.fecha_carga) >= %s")
             params.append(fecha_desde)
 
         if fecha_hasta:
-            filters.append("r.created_at <= %s")
+            filters.append("DATE(r.fecha_carga) <= %s")
             params.append(fecha_hasta)
 
         if buzo_id:
             filters.append("u.id_usuario = %s")
             params.append(buzo_id)
 
-        if estado_validacion:
+        if estado_validacion and estado_validacion.upper() != "ELIMINADO":
             filters.append("LOWER(r.estado_validacion) = LOWER(%s)")
             params.append(estado_validacion)
+        elif estado_validacion and estado_validacion.upper() == "ELIMINADO":
+            filters = ["UPPER(COALESCE(r.estado_validacion, '')) = 'ELIMINADO'"]
 
-        where_sql = ""
-        if filters:
-            where_sql = "WHERE " + " AND ".join(filters)
+        where_sql = "WHERE " + " AND ".join(filters)
 
         query_por_buzo = f"""
             SELECT
                 u.id_usuario AS id_buzo,
                 u.nombre_completo AS nombre_buzo,
-                u.username,
+                u.correo AS username,
                 COUNT(r.*) AS total_plantillas,
                 SUM(CASE WHEN LOWER(COALESCE(r.estado_validacion, '')) = 'validado' THEN 1 ELSE 0 END) AS plantillas_validadas,
                 SUM(CASE WHEN LOWER(COALESCE(r.estado_validacion, 'pendiente_validacion')) <> 'validado' THEN 1 ELSE 0 END) AS plantillas_pendientes,
-                MAX(r.created_at) AS ultima_digitalizacion
+                MAX(r.fecha_carga) AS ultima_digitalizacion
             FROM registros_ocr r
             JOIN usuarios u ON u.id_usuario = r.fk_usuario_creador
             {where_sql}
-            GROUP BY u.id_usuario, u.nombre_completo, u.username
+            GROUP BY u.id_usuario, u.nombre_completo, u.correo
             ORDER BY total_plantillas DESC
         """
 
@@ -86,14 +86,14 @@ def get_buzo_analytics(
 
         query_serie = f"""
             SELECT
-                DATE(r.created_at) AS fecha,
+                DATE(r.fecha_carga) AS fecha,
                 u.id_usuario AS id_buzo,
                 u.nombre_completo AS nombre_buzo,
                 COUNT(r.*) AS total_plantillas
             FROM registros_ocr r
             JOIN usuarios u ON u.id_usuario = r.fk_usuario_creador
             {where_sql}
-            GROUP BY DATE(r.created_at), u.id_usuario, u.nombre_completo
+            GROUP BY DATE(r.fecha_carga), u.id_usuario, u.nombre_completo
             ORDER BY fecha ASC
         """
 

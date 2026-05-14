@@ -19,5 +19,5 @@ ON registros_ocr(fk_usuario_creador);
 CREATE INDEX IF NOT EXISTS idx_registros_ocr_estado_validacion
 ON registros_ocr(estado_validacion);
 
-CREATE INDEX IF NOT EXISTS idx_registros_ocr_created_at
-ON registros_ocr(created_at);
+CREATE INDEX IF NOT EXISTS idx_registros_ocr_fecha_carga
+ON registros_ocr(fecha_carga);

@@ -13,11 +13,11 @@ try:
     print(f"Tablas encontradas ({len(tables)}):", tables)
     
     if "usuarios" in tables:
-        cur.execute("SELECT id_usuario, username, nombre_completo, activo FROM usuarios LIMIT 5")
+        cur.execute("SELECT id_usuario, correo, nombre_completo, activo FROM usuarios LIMIT 5")
         users = cur.fetchall()
         print(f"\nUsuarios ({len(users)}):")
         for u in users:
-            print(f"  ID: {u[0]} | Username: '{u[1]}' | Name: {u[2]} | Activo: {u[3]}")
+            print(f"  ID: {u[0]} | Correo: '{u[1]}' | Name: {u[2]} | Activo: {u[3]}")
     
     conn.close()
 except Exception as e:

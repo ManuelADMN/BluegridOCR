@@ -1,0 +1,49 @@
+# Credenciales — NUNCA subir
+Deploy/backend_api/.env
+Front/.env
+.env
+.env.local
+.env.*.local
+certs/
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+ENV/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Node
+node_modules/
+Front/node_modules/
+Front/dist/
+Front/.vite/
+.npm
+npm-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/

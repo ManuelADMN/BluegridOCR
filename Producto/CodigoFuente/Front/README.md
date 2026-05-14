@@ -1,30 +1,26 @@
 # Bluegrid OCR Manager
 
-Sistema de gestión y dashboard para la digitalización de planillas de acuicultura mediante OCR. Esta aplicación conecta con un backend en Google Colab expuesto vía Ngrok.
+Sistema de gestion y dashboard para la digitalizacion de planillas de acuicultura mediante OCR.
 
-## Características
+## Caracteristicas
 
-*   **Dashboard Gerencial**: Visualización de KPIs, gráficos de capturas y mapa interactivo de zonas.
-*   **Módulo de Digitalización**: Subida de imágenes, procesamiento OCR y validación de matrices.
-*   **Editor de Matriz**: Interfaz tipo Excel para corregir datos con validación visual.
-*   **Mapa Interactivo**: Integración con OpenStreetMap y Leaflet.
+*   **Dashboard Gerencial**: visualizacion de KPIs, graficos de capturas y mapa interactivo de zonas.
+*   **Modulo de Digitalizacion**: subida de imagenes, procesamiento OCR y validacion de matrices.
+*   **Editor de Matriz**: interfaz tipo Excel para corregir datos con validacion visual.
+*   **Mapa Interactivo**: integracion con OpenStreetMap y Leaflet.
 
 ## Prerrequisitos
 
-*   [Node.js](https://nodejs.org/) (Versión 16 o superior)
-*   Una URL activa de Ngrok apuntando al backend de Colab (para la funcionalidad de OCR).
+*   Node.js 18 o superior.
+*   Backend BluegridOCR activo.
 
-## Instalación
-
-1.  Asegúrate de que todos los archivos del proyecto estén en una carpeta.
-2.  Abre tu terminal (Command Prompt / Terminal) en esa carpeta.
-3.  Instala las dependencias ejecutando:
+## Instalacion
 
 ```bash
 npm install
 ```
 
-## Ejecución
+## Ejecucion
 
 Para iniciar el servidor de desarrollo local:
 
@@ -32,18 +28,65 @@ Para iniciar el servidor de desarrollo local:
 npm run dev
 ```
 
-Esto abrirá la aplicación en tu navegador (usualmente en `http://localhost:5173`).
+La aplicacion queda disponible usualmente en `http://localhost:5173`.
 
-## Configuración Inicial
+## Testing con Jasmine y Karma
 
-1.  Al abrir la app, verás un modal de configuración.
-2.  Ingresa la **URL pública de Ngrok** proporcionada por el backend (ej: `https://xxxx-xx-xx.ngrok-free.app`).
-3.  Haz clic en **Probar Conexión**. Si el backend está corriendo, verás un mensaje de éxito.
-4.  Guarda la configuración para acceder al Dashboard.
+El frontend incluye una suite de unit tests en navegador con Jasmine + Karma.
+Las pruebas cubren las funciones compartidas de autenticacion del cliente y la matriz de permisos del sistema.
+
+Comandos disponibles:
+
+```bash
+npm run test:karma
+npm test
+```
+
+Para modo observador durante desarrollo:
+
+```bash
+npm run test:karma:watch
+```
+
+El testing esta separado del codigo de aplicacion en `testing/`:
+
+```txt
+testing/
+  karma.conf.cjs
+  specs/
+    apiClient.spec.ts
+    types.spec.ts
+```
+
+La configuracion vive en `testing/karma.conf.cjs`. En Windows, si Chrome no esta instalado,
+Karma usa Microsoft Edge Headless como binario compatible.
+
+Cobertura actual:
+
+*   `services/apiClient.ts`: lectura y limpieza del token, headers `Authorization` y `ngrok-skip-browser-warning`.
+*   `types.ts`: permisos por rol (`admin`, `supervisor`, `buzo`), zonas iniciales y contrato inicial del dashboard (`context`, `summary`, `kpis`, `barData`, `lineData`, `mapData`).
+
+Ejecucion validada:
+
+```txt
+TOTAL: 21 SUCCESS
+```
+
+## Configuracion Inicial
+
+El frontend usa `VITE_API_BASE_URL` cuando existe. Si no se define, usa `http://localhost:8000`.
+
+Ejemplo de `Front/.env`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+VITE_ENABLE_MOCK_DATA=false
+```
 
 ## Estructura del Proyecto
 
-*   `index.html`: Punto de entrada principal.
-*   `App.tsx`: Componente raíz y enrutamiento.
-*   `components/`: Componentes modulares (Dashboard, Matriz, Configuración).
-*   `types.ts`: Definiciones de tipos TypeScript y Mock Data.
+*   `index.html`: punto de entrada principal.
+*   `App.tsx`: componente raiz y enrutamiento.
+*   `components/`: componentes modulares.
+*   `services/apiClient.ts`: cliente HTTP autenticado.
+*   `types.ts`: definiciones TypeScript y datos iniciales.

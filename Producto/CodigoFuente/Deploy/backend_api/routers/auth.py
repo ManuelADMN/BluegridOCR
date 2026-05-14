@@ -5,6 +5,7 @@ from psycopg2.extras import RealDictCursor
 from services.db import get_connection
 from services.security import verify_password
 from services.jwt_service import create_access_token
+from services.timezone import app_now_naive
 from dependencies.auth import normalize_role
 from core.logger import logger
 
@@ -16,22 +17,23 @@ class LoginPayload(BaseModel):
 
 @router.post("/auth/login")
 def login(payload: LoginPayload):
-    conn = get_connection()
+    conn = None
 
     try:
+        conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute(
             """
             SELECT
                 u.id_usuario,
-                u.username,
+                u.correo AS username,
                 u.nombre_completo,
                 u.password_hash,
                 r.nombre_rol AS rol
             FROM usuarios u
             JOIN roles r ON r.id_rol = u.fk_rol
-            WHERE u.username = %s
+            WHERE LOWER(u.correo) = LOWER(%s)
             AND COALESCE(u.activo, TRUE) = TRUE
             LIMIT 1
             """,
@@ -64,10 +66,10 @@ def login(payload: LoginPayload):
         cur.execute(
             """
             UPDATE usuarios
-            SET last_login_at = NOW()
+            SET last_login_at = %s
             WHERE id_usuario = %s
             """,
-            (row["id_usuario"],)
+            (app_now_naive(), row["id_usuario"],)
         )
         conn.commit()
 
@@ -83,8 +85,16 @@ def login(payload: LoginPayload):
         }
 
     except HTTPException:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise
 
+    except Exception:
+        if conn:
+            conn.rollback()
+        logger.exception("login_error username=%s", payload.username)
+        raise HTTPException(status_code=503, detail="Base de datos no disponible")
+
     finally:
-        conn.close()
+        if conn:
+            conn.close()

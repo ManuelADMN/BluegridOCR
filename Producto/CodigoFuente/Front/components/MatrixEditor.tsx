@@ -1,44 +1,28 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, RotateCcw, AlertCircle, AlertTriangle, ZoomIn, ZoomOut, Eye, EyeOff, Image as ImageIcon, Brain, Maximize } from 'lucide-react';
+import { Save, RotateCcw, AlertCircle, AlertTriangle, ZoomIn, ZoomOut, Eye, EyeOff, Image as ImageIcon, Maximize, Ship, Table2 } from 'lucide-react';
 import { MatrixCell, OCRResponse, User } from '../types';
 import { authFetch } from '../services/apiClient';
+import { getApiBaseUrl } from '../services/runtimeConfig';
+import { bgoLog } from '../services/logger';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 interface MatrixEditorProps {
   data: OCRResponse;
-  imageFile: File | null;
+  imageUrl: string | null;
+  imageRotation?: number;
   currentUser: User | null;
   onSave: (validatedCells: MatrixCell[]) => Promise<void>;
   onNotify: (message: string, type: 'success' | 'error') => void;
   onCancel: () => void;
 }
 
-const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUser, onSave, onNotify, onCancel }) => {
-  // Flattened state of cells used for final submission
+const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotation = 0, currentUser, onSave, onNotify, onCancel }) => {
   const [cells, setCells] = useState<MatrixCell[]>([]);
-  // Store original state to compare changes for AI training
   const [originalCells, setOriginalCells] = useState<MatrixCell[]>([]);
-  
   const [isSaving, setIsSaving] = useState(false);
-  const [isTraining, setIsTraining] = useState(false);
-  
-  // Image View State
   const [showImage, setShowImage] = useState(true);
-
-  // Generate Object URL for image preview
-  const imageUrl = useMemo(() => {
-    if (imageFile) {
-      return URL.createObjectURL(imageFile);
-    }
-    return null;
-  }, [imageFile]);
-
-  // Clean up URL on unmount
-  useEffect(() => {
-    return () => {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
-    };
-  }, [imageUrl]);
+  const tablillaMeta = data.resultado_ia?.tablilla_detectada;
+  const embarcacionDetectada = tablillaMeta?.embarcacion;
 
   // Initialize cells when data loads - Adaptation for Bluegrid_OCRv2
   useEffect(() => {
@@ -116,18 +100,12 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
 
   const handleValueChange = (rowIndex: number, colIndex: number, newValue: string) => {
     setCells(prev => {
-      // We need to match based on the parsed index
-      // We also ensure strict type matching for columns
       const existingIndex = prev.findIndex(c => parseRowIndex(c.fila) === rowIndex && Number(c.col) === colIndex);
-      
       if (existingIndex >= 0) {
-        // Update existing cell
         const newCells = [...prev];
-        // We ensure we preserve ALL existing properties including ref_id
         newCells[existingIndex] = { ...newCells[existingIndex], valor: newValue };
         return newCells;
       } else {
-        // Create new cell (fallback)
         return [...prev, { fila: rowIndex, col: colIndex, valor: newValue, confianza: 1.0 }];
       }
     });
@@ -135,79 +113,57 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
 
   const handleConfirm = async () => {
     setIsSaving(true);
+    bgoLog.step('EDITOR', `Confirmando registro id=${data.id_registro ?? data.id}  celdas_totales=${cells.length}`);
     try {
+      // Detectar celdas que cambiaron respecto al OCR original y tienen recorte
+      const correccionesConRecorte = cells
+        .filter(cell => {
+          const original = originalCells.find(
+            oc => parseRowIndex(oc.fila) === parseRowIndex(cell.fila) && Number(oc.col) === Number(cell.col)
+          );
+          const cambio = original && cell.valor !== original.valor;
+          const recorte = cell.recorte_b64 || cell.recorte_base64;
+          return cambio && cell.ref_id && recorte;
+        })
+        .map(cell => {
+          const original = originalCells.find(
+            oc => parseRowIndex(oc.fila) === parseRowIndex(cell.fila) && Number(oc.col) === Number(cell.col)
+          );
+          return {
+            ref_id: cell.ref_id!,
+            valor_original: original!.valor,
+            valor_corregido: cell.valor,
+            recorte_b64: cell.recorte_b64 || cell.recorte_base64 || '',
+          };
+        });
+
+      if (correccionesConRecorte.length > 0) {
+        bgoLog.info('EDITOR', `Enviando ${correccionesConRecorte.length} correcciones con imagen al servidor:`);
+        correccionesConRecorte.forEach(c =>
+          bgoLog.data('EDITOR', `  ${c.ref_id}`, { original: c.valor_original, corregido: c.valor_corregido, imagen: c.recorte_b64 ? `${Math.round(c.recorte_b64.length/1024)}KB` : 'sin imagen' })
+        );
+        const baseUrl = localStorage.getItem('bluegrid_api_url') || getApiBaseUrl();
+        authFetch(`${baseUrl}/api/v1/training/feedback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_registro: data.id_registro ?? data.id,
+            zona_id: Number(data.zona_id) || 1,
+            correcciones: correccionesConRecorte,
+          }),
+        })
+          .then(r => bgoLog.info('EDITOR', `Feedback guardado en Supabase: HTTP ${r.status}`))
+          .catch(e => bgoLog.error('EDITOR', `Feedback falló: ${e.message}`));
+      } else {
+        bgoLog.info('EDITOR', 'Sin correcciones con imagen — no se envía feedback');
+      }
+
       await onSave(cells);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // --- HUMAN-IN-THE-LOOP LOGIC (LIGHTWEIGHT V3 - WITH REF_ID) ---
-  const handleSendFeedback = async () => {
-    setIsTraining(true);
-    
-    try {
-      // 1. Construcción del Payload usando ref_id
-      const corrections = cells.map(currentCell => {
-        // Parsear índices para info adicional
-        const rIndex = parseRowIndex(currentCell.fila);
-        const cIndex = Number(currentCell.col);
-        
-        // Buscar original (opcional para comparativa local)
-        const originalCell = originalCells.find(oc => 
-          parseRowIndex(oc.fila) === rIndex && Number(oc.col) === cIndex
-        );
-
-        return {
-          ref_id: currentCell.ref_id || "", // CRÍTICO: ID único del backend
-          valor_corregido: currentCell.valor,
-          fila: rIndex,         // int (informativo)
-          col: cIndex,          // int (informativo)
-          valor_original: originalCell ? originalCell.valor : "",
-        };
-      });
-
-      // Filter out invalid cells (those without ref_id if backend requires it strict)
-      // or keep them if backend handles legacy index-based fallback.
-      const validCorrections = corrections.filter(c => {
-         if(!c.ref_id) console.warn("Cell missing ref_id:", c);
-         return true; 
-      });
-
-      const payload = {
-        zona_id: Number(data.zona_id) || 1,
-        // Use currentUser.id if available, fallback to 1 (admin)
-        usuario_id: currentUser?.id || 1, 
-        correcciones: validCorrections
-      };
-
-      console.log("[Feedback] Enviando payload v3 (ref_id):", payload);
-
-      // 2. Enviar petición POST
-      const baseUrl = localStorage.getItem('bluegrid_api_url') || "";
-      
-      const response = await authFetch(`${baseUrl}/api/v1/training/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      onNotify("Feedback enviado correctamente (ID Ref)", "success");
-
-    } catch (err: any) {
-      console.error("Error enviando feedback:", err);
-      onNotify("Error al enviar feedback: " + err.message, "error");
-    } finally {
-      setIsTraining(false);
-    }
-  };
 
   return (
     <div className="animate-in fade-in zoom-in duration-300 pb-20 w-full">
@@ -219,9 +175,22 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
             <span className="bg-white dark:bg-zinc-900 text-black dark:text-white px-3 py-1 rounded-full text-[10px] font-mono border border-gray-200 dark:border-zinc-800 font-bold uppercase tracking-widest">
               ID: {data.id}
             </span>
+            {data.resultado_ia?.tablilla_id && (
+              <>
+                <span className="hidden md:inline text-gray-300 dark:text-zinc-700">•</span>
+                <span className="bg-black dark:bg-white text-white dark:text-black px-3 py-1 rounded-full text-[10px] font-mono border border-gray-800 dark:border-gray-200 font-bold uppercase tracking-widest">
+                  Tabla: {data.resultado_ia.tablilla_id}
+                </span>
+              </>
+            )}
+            {data.resultado_ia?.tablilla_id_raw && data.resultado_ia.tablilla_id_raw !== data.resultado_ia.tablilla_id && (
+              <span className="text-gray-400 dark:text-zinc-500 text-[10px] font-mono font-bold uppercase tracking-widest">
+                Leído: {data.resultado_ia.tablilla_id_raw}
+              </span>
+            )}
             <span className="hidden md:inline text-gray-300 dark:text-zinc-700">•</span>
             <span className="text-yellow-600 dark:text-yellow-500 flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-widest">
-              <AlertTriangle className="w-3.5 h-3.5" /> 
+              <AlertTriangle className="w-3.5 h-3.5" />
               Validación Requerida
             </span>
             <span className="hidden md:inline text-gray-300 dark:text-zinc-700">•</span>
@@ -245,22 +214,7 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
             <span className="hidden md:inline">Descartar</span>
           </button>
           
-          {/* BOTÓN ENVIAR A DATASET (HUMAN IN THE LOOP) */}
-          <button 
-            onClick={handleSendFeedback}
-            disabled={isTraining}
-            className="pointer-events-auto inline-flex items-center justify-center rounded-full text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black dark:focus-visible:ring-white disabled:pointer-events-none disabled:opacity-50 bg-gray-100 dark:bg-zinc-900 text-black dark:text-white hover:bg-gray-200 dark:hover:bg-zinc-800 h-12 md:h-12 px-6 md:px-6 py-2 gap-2"
-            title="Enviar feedback para re-entrenamiento"
-          >
-            {isTraining ? (
-              <div className="w-4 h-4 border-2 border-black dark:border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Brain className="w-4 h-4" />
-            )}
-            <span className="hidden md:inline">Enviar a Dataset</span>
-          </button>
-
-          <button 
+          <button
             onClick={handleConfirm}
             disabled={isSaving}
             className="pointer-events-auto inline-flex items-center justify-center rounded-full text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black dark:focus-visible:ring-white disabled:pointer-events-none disabled:opacity-50 bg-black dark:bg-white text-white dark:text-black shadow-xl hover:bg-gray-800 dark:hover:bg-gray-200 h-12 md:h-12 px-8 md:px-8 py-2"
@@ -273,6 +227,42 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
             <span className="hidden md:inline">Confirmar</span>
             <span className="md:hidden">Guardar</span>
           </button>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-3 md:grid-cols-2">
+        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#050505]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+            <Table2 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400">ID tabla detectado</p>
+            <p className="mt-1 text-lg font-bold text-black dark:text-white">
+              {data.resultado_ia?.tablilla_id || 'No identificado'}
+            </p>
+            <p className="mt-1 text-xs font-medium text-gray-500 dark:text-zinc-400">
+              {tablillaMeta?.tablilla_encontrada
+                ? 'Coincide con una tabla disponible en la BDD.'
+                : 'No existe en la BDD. Créala o asígnala desde Usuarios > Tablas asignadas.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-zinc-800 dark:bg-[#050505]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <Ship className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400">Embarcación asociada</p>
+            <p className="mt-1 text-lg font-bold text-black dark:text-white">
+              {embarcacionDetectada ? embarcacionDetectada.nombre : 'Sin asociación'}
+            </p>
+            <p className="mt-1 text-xs font-medium text-gray-500 dark:text-zinc-400">
+              {embarcacionDetectada
+                ? `Matrícula ${embarcacionDetectada.matricula}`
+                : 'La relación no se crea automáticamente; debes asociarla manualmente.'}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -311,11 +301,17 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageFile, currentUse
                     </div>
                   </div>
                   <div className="bg-gray-100/50 dark:bg-zinc-900/50 h-[250px] md:h-[300px] xl:h-[calc(100vh-280px)] max-h-[600px] relative overflow-hidden cursor-grab active:cursor-grabbing">
-                    <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%" }}>
-                      <img 
-                        src={imageUrl} 
-                        alt="Referencia de Planilla" 
-                        className="w-full h-full object-contain pointer-events-none"
+                    <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <img
+                        src={imageUrl}
+                        alt="Referencia de Planilla"
+                        style={{
+                          transform: `rotate(${imageRotation}deg)`,
+                          maxWidth: imageRotation === 90 || imageRotation === 270 ? '80%' : '100%',
+                          maxHeight: imageRotation === 90 || imageRotation === 270 ? '80%' : '100%',
+                          objectFit: 'contain',
+                        }}
+                        className="pointer-events-none"
                       />
                     </TransformComponent>
                   </div>

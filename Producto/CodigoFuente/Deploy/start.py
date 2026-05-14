@@ -19,6 +19,9 @@ load_dotenv(API_DIR / ".env")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 NGROK_TOKEN       = os.environ.get("NGROK_TOKEN", "")
+HTTPS_ENABLED     = os.environ.get("HTTPS_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+SSL_CERTFILE      = os.environ.get("SSL_CERTFILE", "")
+SSL_KEYFILE       = os.environ.get("SSL_KEYFILE", "")
 
 # ── Validar credenciales ──────────────────────────────────────────────────────
 print("\n🔍 Verificando credenciales...")
@@ -50,12 +53,24 @@ for f in criticos:
         sys.exit(1)
 
 # ── Arrancar Uvicorn ──────────────────────────────────────────────────────────
-print(f"\n⏳ Arrancando backend en http://{HOST}:{PORT} ...")
+scheme = "https" if HTTPS_ENABLED else "http"
+server_cmd = [
+    sys.executable, "-m", "uvicorn", "main:app",
+    "--host", HOST, "--port", str(PORT), "--reload"
+]
+if HTTPS_ENABLED:
+    cert_path = (API_DIR / SSL_CERTFILE).resolve() if SSL_CERTFILE and not Path(SSL_CERTFILE).is_absolute() else Path(SSL_CERTFILE)
+    key_path = (API_DIR / SSL_KEYFILE).resolve() if SSL_KEYFILE and not Path(SSL_KEYFILE).is_absolute() else Path(SSL_KEYFILE)
+    if not cert_path.exists() or not key_path.exists():
+        print("❌ HTTPS_ENABLED=true pero no existen SSL_CERTFILE/SSL_KEYFILE.")
+        sys.exit(1)
+    server_cmd.extend(["--ssl-certfile", str(cert_path), "--ssl-keyfile", str(key_path)])
+
+print(f"\n⏳ Arrancando backend en {scheme}://{HOST}:{PORT} ...")
 env = {**os.environ, "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY}
 
 server = subprocess.Popen(
-    [sys.executable, "-m", "uvicorn", "main:app",
-     "--host", HOST, "--port", str(PORT), "--reload"],
+    server_cmd,
     cwd=str(API_DIR),
     env=env,
     stdout=subprocess.PIPE,
@@ -73,7 +88,7 @@ while time.time() - start_t < 60:
         print(server.stdout.read())
         sys.exit(1)
     try:
-        if requests.get(f"http://{HOST}:{PORT}/", timeout=2).status_code < 500:
+        if requests.get(f"{scheme}://{HOST}:{PORT}/", timeout=2, verify=False).status_code < 500:
             ready = True
             break
     except Exception:
@@ -109,8 +124,8 @@ if use_ngrok:
 
 if not public_url:
     print("=" * 60)
-    print(f"🏠 Backend local : http://{HOST}:{PORT}")
-    print(f"📘 Swagger       : http://{HOST}:{PORT}/docs")
+    print(f"🏠 Backend local : {scheme}://{HOST}:{PORT}")
+    print(f"📘 Swagger       : {scheme}://{HOST}:{PORT}/docs")
     print("=" * 60)
 
 # ── Streaming de logs ─────────────────────────────────────────────────────────
