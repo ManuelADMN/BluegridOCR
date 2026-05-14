@@ -1,11 +1,11 @@
--- ============================================================================
+﻿-- ============================================================================
 -- BLUEGRIDOCR - BASE DE DATOS COMPLETA PARA SUPABASE / POSTGRESQL
 -- ============================================================================
 -- Archivo oficial para preparar la BDD que consume el backend FastAPI.
 --
 -- Login admin inicial:
 --   usuario:  admin@bluegrid.cl
---   password: BGCwc5NLVULdnmItX7
+--   password: <PASSWORD_ADMIN_DEFINIDA_EN_INFORME>
 --
 -- Notas de compatibilidad:
 --   - El frontend llama al identificador como "username".
@@ -302,7 +302,7 @@ VALUES
     '11.111.111-1',
     'Administrador General',
     'admin@bluegrid.cl',
-    crypt('BGCwc5NLVULdnmItX7', gen_salt('bf', 12)),
+    crypt('<PASSWORD_ADMIN_DEFINIDA_EN_INFORME>', gen_salt('bf', 12)),
     (SELECT id_rol FROM roles WHERE nombre_rol = 'admin'),
     TRUE,
     CURRENT_TIMESTAMP,
@@ -312,7 +312,7 @@ VALUES
     '22.222.222-2',
     'Supervisor Demo',
     'supervisor@bluegrid.cl',
-    crypt('supervisor1234', gen_salt('bf', 12)),
+    crypt('<PASSWORD_SUPERVISOR_DEMO>', gen_salt('bf', 12)),
     (SELECT id_rol FROM roles WHERE nombre_rol = 'supervisor'),
     TRUE,
     CURRENT_TIMESTAMP,
@@ -322,7 +322,7 @@ VALUES
     '33.333.333-3',
     'Buzo Demo',
     'buzo@bluegrid.cl',
-    crypt('buzo1234', gen_salt('bf', 12)),
+    crypt('<PASSWORD_BUZO_DEMO>', gen_salt('bf', 12)),
     (SELECT id_rol FROM roles WHERE nombre_rol = 'buzo'),
     TRUE,
     CURRENT_TIMESTAMP,
@@ -406,3 +406,4 @@ COMMIT;
 -- SELECT * FROM roles ORDER BY id_rol;
 -- SELECT id_usuario, rut, correo, nombre_completo, activo FROM usuarios ORDER BY id_usuario;
 -- SELECT COUNT(*) AS registros FROM registros_ocr;
+

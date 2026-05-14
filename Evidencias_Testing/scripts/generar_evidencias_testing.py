@@ -43,6 +43,7 @@ def http_request(method: str, url: str, body: bytes | None = None, headers: dict
                 "status": response.status,
                 "ok": 200 <= response.status < 400,
                 "elapsed_ms": elapsed,
+                "_body_text": raw.decode("utf-8", errors="replace"),
                 "body_preview": raw[:500].decode("utf-8", errors="replace"),
             }
     except error.HTTPError as exc:
@@ -54,6 +55,7 @@ def http_request(method: str, url: str, body: bytes | None = None, headers: dict
             "status": exc.code,
             "ok": False,
             "elapsed_ms": elapsed,
+            "_body_text": raw.decode("utf-8", errors="replace"),
             "body_preview": raw[:500].decode("utf-8", errors="replace"),
         }
     except Exception as exc:
@@ -89,21 +91,33 @@ def run_command(command: list[str], cwd: Path) -> dict:
     }
 
 
+def strip_internal_fields(value):
+    if isinstance(value, dict):
+        return {
+            key: strip_internal_fields(item)
+            for key, item in value.items()
+            if not key.startswith("_")
+        }
+    if isinstance(value, list):
+        return [strip_internal_fields(item) for item in value]
+    return value
+
+
 def write_json(name: str, data: dict) -> None:
     path = TXT_DIR / f"{name}.json"
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(json.dumps(strip_internal_fields(data), indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def parse_json_response(response: dict) -> dict:
     try:
-        return json.loads(response.get("body_preview") or "{}")
+        return json.loads(response.get("_body_text") or response.get("body_preview") or "{}")
     except Exception:
         return {}
 
 
 def sanitized_auth_response(response: dict, username: str) -> dict:
     data = parse_json_response(response)
-    safe = dict(response)
+    safe = strip_internal_fields(dict(response))
     if response.get("status") == 200:
         safe["body_preview"] = json.dumps(
             {
@@ -119,7 +133,7 @@ def sanitized_auth_response(response: dict, username: str) -> dict:
 
 def sanitized_ocr_response(response: dict) -> dict:
     data = parse_json_response(response)
-    safe = dict(response)
+    safe = strip_internal_fields(dict(response))
     if response.get("status") == 200:
         result = data.get("resultado_ia") or {}
         safe["body_preview"] = json.dumps(
@@ -435,7 +449,7 @@ def main() -> int:
         "compatibility": compatibility,
     }
     write_json("00_resumen_generacion_evidencias", summary)
-    print(json.dumps(summary, indent=2, ensure_ascii=False))
+    print(json.dumps(strip_internal_fields(summary), indent=2, ensure_ascii=False))
     return 0
 
 

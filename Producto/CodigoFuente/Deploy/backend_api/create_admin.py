@@ -73,6 +73,10 @@ def upsert_admin(username: str, password: str) -> None:
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT set_config('app.role', %s, true)", ("admin",))
+            cur.execute("SELECT set_config('app.email', %s, true)", (username,))
+            cur.execute("SELECT set_config('app.source', %s, true)", ("create_admin.py",))
+
             admin_role_id = ensure_admin_role(cur)
 
             cur.execute(

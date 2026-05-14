@@ -1,7 +1,7 @@
 import bcrypt
 
-hashed_pw = "$2y$12$Z/c.TZTylWpevHeETwQwRO1bsdD98FfhnONrhf0MD0mOGCyFKLMT."
-plain_pw = "admin1234"
+hashed_pw = "$2b$12$Hw8EU7eW3dgQIk51/OVY2eeWSotOy/RSsf9ugP5mr5ppJFErTQTP."
+plain_pw = "BGCwc5NLVULdnmItX7"
 
 try:
     # Test checkpw

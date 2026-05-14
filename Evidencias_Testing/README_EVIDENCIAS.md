@@ -45,6 +45,7 @@ Evidencias_Testing/
 |   |-- Compatibilidad.png
 |
 |-- imagenes/
+|   |-- Estructura_Evidencias_Testing.png
 |-- scripts/
 |-- txt/
 |-- README.md
@@ -79,8 +80,17 @@ txt/01_backend_health.txt
 txt/02_backend_ready_db_ia_jwt.txt
 txt/08_frontend_build.txt
 txt/11_dashboard_data_response.txt
+txt/12_admin_access_users_response.txt
 txt/00_resumen_generacion_evidencias.json
 ```
+
+## Acceso de Evaluacion
+
+| Usuario | Contrasena | Rol |
+| --- | --- | --- |
+| `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
+
+El usuario fue actualizado en la base de datos y validado con login HTTP 200. Por seguridad, los tokens JWT no se guardan en los archivos de evidencia.
 
 ## Regeneracion
 

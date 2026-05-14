@@ -3,6 +3,6 @@
   "url": "http://127.0.0.1:8000/api/v1/dashboard/data?fecha_desde=2026-04-14&fecha_hasta=2026-05-14",
   "status": 401,
   "ok": false,
-  "elapsed_ms": 11.69,
+  "elapsed_ms": 11.8,
   "body_preview": "{\"detail\":\"Not authenticated\"}"
 }

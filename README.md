@@ -95,6 +95,7 @@ BluegridOCR/
 |   |   |-- 03_muestra_ocr_grid_preview.png
 |   |   |-- 04_muestra_ocr_contact_sheet_count.png
 |   |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
+|   |   |-- Estructura_Evidencias_Testing.png
 |   |-- scripts/
 |   |   |-- generar_evidencias_testing.py
 |   |   |-- rotar_tablilla.py
@@ -472,13 +473,21 @@ Producto/Scripts_BD/
 Producto/CodigoFuente/Deploy/backend_api/sql/
 ```
 
-Usuario administrador inicial esperado:
+Usuario administrador de evaluacion:
 
-| Usuario | Contrasena inicial | Rol |
+| Usuario | Contrasena | Rol |
 | ------- | ------------------ | --- |
-| `admin` | `admin1234` | `admin` |
+| `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
 
-Se recomienda cambiar la contrasena inicial despues del primer inicio de sesion.
+Este usuario permite entrar como administrador y revisar todo el sistema durante la evaluacion. Se recomienda cambiar o rotar esta contrasena despues de la entrega.
+
+Para recrearlo o actualizarlo contra la base de datos:
+
+```powershell
+cd Producto/CodigoFuente/Deploy/backend_api
+$env:ADMIN_PASSWORD="BGCwc5NLVULdnmItX7"
+python create_admin.py --username admin@bluegrid.cl
+```
 
 ---
 
@@ -556,6 +565,7 @@ Evidencias_Testing/
 |   |-- 03_muestra_ocr_grid_preview.png
 |   |-- 04_muestra_ocr_contact_sheet_count.png
 |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
+|   |-- Estructura_Evidencias_Testing.png
 |
 |-- scripts/
 |   |-- generar_evidencias_testing.py
@@ -584,6 +594,8 @@ Evidencias_Testing/
 
 Los resultados crudos quedan en `Evidencias_Testing/txt/` como respaldo `.txt` y `.json`.
 
+Archivo adicional relevante: `txt/12_admin_access_users_response.txt` confirma login admin y acceso HTTP 200 a `/api/v1/users`.
+
 ### Evidencias visuales
 
 | Archivo | Que contiene |
@@ -593,6 +605,7 @@ Los resultados crudos quedan en `Evidencias_Testing/txt/` como respaldo `.txt` y
 | `imagenes/03_muestra_ocr_grid_preview.png` | Vista previa de grilla detectada. |
 | `imagenes/04_muestra_ocr_contact_sheet_count.png` | Hoja de contacto para auditoria visual de conteo/debug. |
 | `imagenes/05_muestra_ocr_original_rotada_90_clockwise.jpg` | Evidencia de rotacion generada por script. |
+| `imagenes/Estructura_Evidencias_Testing.png` | Imagen resumen de la estructura de evidencias para anexar al informe. |
 
 ### Script de apoyo
 
@@ -632,7 +645,7 @@ python Evidencias_Testing/scripts/generar_evidencias_testing.py
 [x] Rutas protegidas rechazan acceso sin token.
 [x] Evidencias visuales OCR/debug incluidas.
 [x] Script de rotacion incluido.
-[ ] Falta adjuntar la imagen exacta de tablilla compartida por el usuario como archivo local.
+[x] Imagen de estructura `Evidencias_Testing` generada para el informe.
 [x] OCR completo ejecutado con usuario valido y token vigente.
 ```
 

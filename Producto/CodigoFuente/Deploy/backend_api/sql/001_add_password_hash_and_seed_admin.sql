@@ -1,13 +1,15 @@
 -- =========================================================
--- MIGRACIÓN DE SEGURIDAD PARA BLUEGRIDOCR
+-- MIGRACION DE SEGURIDAD PARA BLUEGRIDOCR
 -- =========================================================
 -- Objetivo:
--- - Agregar password_hash para no guardar contraseñas en texto plano.
+-- - Agregar password_hash para no guardar contrasenas en texto plano.
 -- - Crear roles base si no existen.
--- - Crear usuario admin inicial con contraseña real: admin1234.
+-- - Crear usuario admin inicial de evaluacion.
 --
--- Hash bcrypt admin1234:
--- $2y$12$Z/c.TZTylWpevHeETwQwRO1bsdD98FfhnONrhf0MD0mOGCyFKLMT.
+-- Usuario: admin@bluegrid.cl
+-- Rol: admin
+-- Hash bcrypt de la contrasena de evaluacion:
+-- $2b$12$Hw8EU7eW3dgQIk51/OVY2eeWSotOy/RSsf9ugP5mr5ppJFErTQTP.
 -- =========================================================
 
 ALTER TABLE usuarios
@@ -32,18 +34,22 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO usuarios (
-    username,
+    correo,
+    rut,
     nombre_completo,
     password_hash,
-    fk_rol
+    fk_rol,
+    activo
 )
 SELECT
-    'admin',
+    'admin@bluegrid.cl',
+    'USR-admin-bluegrid',
     'Administrador General',
-    '$2y$12$Z/c.TZTylWpevHeETwQwRO1bsdD98FfhnONrhf0MD0mOGCyFKLMT.',
-    r.id_rol
+    '$2b$12$Hw8EU7eW3dgQIk51/OVY2eeWSotOy/RSsf9ugP5mr5ppJFErTQTP.',
+    r.id_rol,
+    TRUE
 FROM roles r
 WHERE LOWER(r.nombre_rol) = 'admin'
 AND NOT EXISTS (
-    SELECT 1 FROM usuarios WHERE username = 'admin'
+    SELECT 1 FROM usuarios WHERE LOWER(correo) = LOWER('admin@bluegrid.cl')
 );

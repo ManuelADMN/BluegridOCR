@@ -3,6 +3,6 @@
   "url": "http://127.0.0.1:8000/api/v1/context/zonas",
   "status": 200,
   "ok": true,
-  "elapsed_ms": 1297.74,
+  "elapsed_ms": 1261.62,
   "body_preview": "[{\"id\":1,\"name\":\"Melinka\"},{\"id\":2,\"name\":\"Huenquillahue\"},{\"id\":3,\"name\":\"Ancud\"},{\"id\":4,\"name\":\"Melinka\"},{\"id\":5,\"name\":\"Huenquillahue\"}]"
 }

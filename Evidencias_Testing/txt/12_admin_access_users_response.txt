@@ -1,0 +1,9 @@
+Prueba admin real:
+username=admin@bluegrid.cl
+password=<documentada_en_README_para_evaluacion>
+rol=admin
+login=HTTP 200 OK
+ruta_admin=/api/v1/users
+ruta_admin_resultado=HTTP 200 OK
+usuarios_visibles=3
+token=<omitido_por_seguridad>

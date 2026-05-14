@@ -27,6 +27,7 @@ Evidencias_Testing/
 |   |-- Compatibilidad.png
 |
 |-- imagenes/
+|   |-- Estructura_Evidencias_Testing.png
 |-- scripts/
 |-- txt/
 |-- README.md
@@ -65,9 +66,19 @@ Evidencias_Testing/
 | `Pruebas_No_Funcionales/Seguridad.png` | Acceso a ruta protegida sin token. | OK: `401 Unauthorized`. |
 | `Pruebas_No_Funcionales/Compatibilidad.png` | Versiones de Python, Node, npm y compilacion backend. | OK. |
 
+Adicionalmente, `txt/12_admin_access_users_response.txt` documenta que el usuario admin validado puede consultar `/api/v1/users` con HTTP 200.
+
 ## Archivos complementarios
 
-La carpeta `txt/` contiene los resultados en texto/JSON de las pruebas ejecutadas. La carpeta `imagenes/` contiene artefactos visuales OCR/debug y muestras rotadas. La carpeta `scripts/` contiene utilidades para generar evidencias y rotar imagenes.
+La carpeta `txt/` contiene los resultados en texto/JSON de las pruebas ejecutadas. La carpeta `imagenes/` contiene artefactos visuales OCR/debug, muestras rotadas y la imagen `Estructura_Evidencias_Testing.png` para anexar al informe. La carpeta `scripts/` contiene utilidades para generar evidencias y rotar imagenes.
+
+## Acceso de evaluacion
+
+| Usuario | Contrasena | Rol |
+| --- | --- | --- |
+| `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
+
+Este acceso fue validado contra `/api/v1/auth/login` y permite revisar los modulos administrativos. Se recomienda rotarlo despues de la evaluacion.
 
 Para regenerar la bateria de evidencias:
 
