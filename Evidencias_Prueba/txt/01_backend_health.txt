@@ -1,0 +1,5 @@
+﻿{
+    "status":  "ok",
+    "service":  "BluegridOCR API",
+    "environment":  "development"
+}

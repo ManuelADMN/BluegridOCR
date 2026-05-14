@@ -1,0 +1,8 @@
+﻿Prueba de login con credenciales documentadas:
+username=admin
+password=admin1234
+
+Resultado:
+The remote server returned an error: (401) Unauthorized.
+
+Interpretacion: el backend responde y valida credenciales; la base actual no acepta el usuario admin/admin1234. Para evidencia funcional de login, ejecutar con credenciales vigentes del ambiente.

@@ -1,0 +1,9 @@
+﻿{
+    "status":  "ready",
+    "checks":  {
+                   "database":  true,
+                   "anthropic_key":  true,
+                   "jwt_secret":  true
+               },
+    "anthropic_model":  "claude-sonnet-4-6"
+}

@@ -1,0 +1,5 @@
+﻿Fecha de ejecucion: 2026-05-14 11:53:23 -04:00
+Directorio raiz: C:\Users\madzm\OneDrive\Desktop\Proyectos\EntregaPractica\BluegridOCR
+Python: Python 3.13.12
+Node: v24.14.0
+npm: 11.2.0

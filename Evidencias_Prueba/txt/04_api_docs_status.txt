@@ -1,0 +1,4 @@
+﻿StatusCode=200
+StatusDescription=OK
+ContentLength=1014
+URL=http://127.0.0.1:8000/docs

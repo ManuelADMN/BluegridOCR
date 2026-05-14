@@ -1,0 +1,26 @@
+﻿OpenAPI disponible: SI
+Cantidad de endpoints publicados: 22
+
+Endpoints:
+/
+/api/v1/analytics/buzos
+/api/v1/auth/login
+/api/v1/context/embarcaciones
+/api/v1/context/tablillas
+/api/v1/context/tablillas/{tablilla_id}
+/api/v1/context/zonas
+/api/v1/dashboard/data
+/api/v1/health
+/api/v1/ready
+/api/v1/registros
+/api/v1/registros/{registro_id}
+/api/v1/registros/{registro_id}/estado
+/api/v1/registros/{registro_id}/rechazo
+/api/v1/registros/{registro_id}/validacion
+/api/v1/reports/export
+/api/v1/reports/history
+/api/v1/training/excepciones/{usuario_id}
+/api/v1/training/feedback
+/api/v1/users
+/api/v1/users/{user_id}
+/api/v1/users/analytics

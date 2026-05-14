@@ -1,0 +1,5 @@
+﻿Imagen original: Evidencias_Prueba\imagenes\01_muestra_ocr_original.jpg
+Tamano original: 960x1280
+Imagen rotada: Evidencias_Prueba\imagenes\05_muestra_ocr_original_rotada_90_clockwise.jpg
+Tamano rotado: 1280x960
+Rotacion aplicada: clockwise
