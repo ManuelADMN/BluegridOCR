@@ -70,6 +70,30 @@ BluegridOCR/
 |   |   |-- ModeloVista4_1.png
 |   |-- Wireframe/
 |
+|-- Evidencias_Testing/
+|   |-- README_EVIDENCIAS.md
+|   |-- txt/
+|   |   |-- 00_contexto_ejecucion.txt
+|   |   |-- 01_backend_health.txt
+|   |   |-- 02_backend_ready_db_ia_jwt.txt
+|   |   |-- 03_frontend_http_status.txt
+|   |   |-- 04_api_docs_status.txt
+|   |   |-- 05_openapi_endpoints.txt
+|   |   |-- 06_backend_py_compile.txt
+|   |   |-- 07_login_admin_default.txt
+|   |   |-- 08_frontend_build.txt
+|   |   |-- 09_rotacion_imagen_muestra.txt
+|   |   |-- 10_backend_logs_tail.txt
+|   |   |-- 11_dashboard_data_response.txt
+|   |-- imagenes/
+|   |   |-- 01_muestra_ocr_original.jpg
+|   |   |-- 02_muestra_ocr_warped.png
+|   |   |-- 03_muestra_ocr_grid_preview.png
+|   |   |-- 04_muestra_ocr_contact_sheet_count.png
+|   |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
+|   |-- scripts/
+|       |-- rotar_tablilla.py
+|
 |-- Gestion/
 |   |-- Integrantes.txt
 |   |-- README_Gestion.md
@@ -83,6 +107,7 @@ BluegridOCR/
 |   |   |-- vistasBluegrid.sql
 |   |
 |   |-- CodigoFuente/
+|       |-- .gitignore
 |       |-- README.md
 |       |-- run.py
 |       |-- HTTPS.md
@@ -99,26 +124,35 @@ BluegridOCR/
 |       |   |-- vite.config.ts
 |       |   |-- tsconfig.json
 |       |   |-- Dockerfile
+|       |   |-- README.md
+|       |   |-- metadata.json
 |       |   |-- nginx.conf
 |       |   |-- nginx.azure.conf
 |       |   |-- nginx.https.conf
 |       |   |-- config.template.js
 |       |   |-- public/
 |       |   |-- components/
+|       |   |   |-- ui/
 |       |   |-- services/
 |       |   |-- lib/
 |       |   |-- testing/
+|       |   |   |-- specs/
 |       |   |-- docker-entrypoint.d/
 |       |
 |       |-- Deploy/
 |       |   |-- start.py
 |       |   |-- Deploy.ipynb
 |       |   |-- backend_api/
+|       |       |-- .env.example
 |       |       |-- main.py
 |       |       |-- run_server.py
 |       |       |-- requirements.txt
 |       |       |-- Dockerfile
-|       |       |-- .env.example
+|       |       |-- create_admin.py
+|       |       |-- seed_admin.py
+|       |       |-- seed_admin_final.py
+|       |       |-- test_bcrypt.py
+|       |       |-- test_db.py
 |       |       |-- core/
 |       |       |-- dependencies/
 |       |       |-- routers/
@@ -128,6 +162,7 @@ BluegridOCR/
 |       |
 |       |-- scripts/
 |       |-- tmp/
+|           |-- ocr_debug/
 ```
 
 Archivo sensible requerido para ejecutar:
@@ -137,6 +172,8 @@ Producto/CodigoFuente/Deploy/backend_api/.env
 ```
 
 Ese archivo debe crearse manualmente a partir de las variables indicadas en el informe de entrega.
+
+Nota: carpetas generadas durante la ejecucion, como `node_modules/`, `dist/`, `__pycache__/`, `logs/` y archivos `.log`, pueden existir localmente pero no forman parte de la estructura que debe versionarse.
 
 ---
 
@@ -474,7 +511,7 @@ Checks funcionales minimos:
 La carpeta de evidencias tecnicas del proyecto se encuentra en:
 
 ```txt
-Evidencias_Prueba/
+Evidencias_Testing/
 ```
 
 Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la entrega. Su objetivo es dejar respaldo verificable de que el sistema levanta, responde, valida configuracion critica, compila, construye el frontend y protege rutas privadas.
@@ -482,7 +519,7 @@ Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la en
 ### Estructura de Evidencias_Testing
 
 ```txt
-Evidencias_Prueba/
+Evidencias_Testing/
 |-- README_EVIDENCIAS.md
 |
 |-- txt/
@@ -543,19 +580,19 @@ Evidencias_Prueba/
 El script:
 
 ```txt
-Evidencias_Prueba/scripts/rotar_tablilla.py
+Evidencias_Testing/scripts/rotar_tablilla.py
 ```
 
 permite rotar una imagen de tablilla y generar una version corregida para adjuntarla como evidencia visual:
 
 ```powershell
-python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
+python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
 ```
 
 Si la orientacion correcta queda hacia el otro lado:
 
 ```powershell
-python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
+python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
 ```
 
 ### Estado de cierre de evidencias

@@ -2,7 +2,7 @@
 
 Fecha de generacion: 2026-05-14  
 Proyecto: BluegridOCR  
-Carpeta: `Evidencias_Prueba/`
+Carpeta: `Evidencias_Testing/`
 
 Este documento resume las evidencias tecnicas generadas para demostrar que el sistema levanta correctamente, expone sus servicios, valida configuracion critica, compila y protege rutas privadas.
 
@@ -45,7 +45,7 @@ Rutas protegidas: OK, rechazan acceso sin token
 Abrir esta carpeta:
 
 ```txt
-Evidencias_Prueba/
+Evidencias_Testing/
 ```
 
 Revisar primero:
@@ -215,25 +215,25 @@ La imagen compartida en el chat debe guardarse manualmente como archivo local pa
 Guardar la imagen en:
 
 ```txt
-Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg
+Evidencias_Testing/imagenes/tablilla_original_usuario.jpg
 ```
 
 Luego ejecutar:
 
 ```powershell
-python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
+python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
 ```
 
 Si la orientacion correcta queda hacia el otro lado:
 
 ```powershell
-python Evidencias_Prueba/scripts/rotar_tablilla.py Evidencias_Prueba/imagenes/tablilla_original_usuario.jpg Evidencias_Prueba/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
+python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
 ```
 
 El script se encuentra en:
 
 ```txt
-Evidencias_Prueba/scripts/rotar_tablilla.py
+Evidencias_Testing/scripts/rotar_tablilla.py
 ```
 
 ## Evidencia OCR Funcional Completa
@@ -289,4 +289,3 @@ Resultado: la base actual no acepta esa credencial por defecto. Esto no signific
 Las evidencias actuales corroboran tecnicamente que BluegridOCR levanta correctamente, sirve frontend, expone API, tiene documentacion interactiva, compila, construye el frontend, valida configuracion critica y protege rutas autenticadas.
 
 La unica evidencia pendiente para cierre funcional total es el procesamiento OCR con la imagen exacta de tablilla del usuario usando credenciales validas del ambiente.
-
