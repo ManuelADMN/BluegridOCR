@@ -71,20 +71,24 @@ BluegridOCR/
 |   |-- Wireframe/
 |
 |-- Evidencias_Testing/
+|   |-- README.md
 |   |-- README_EVIDENCIAS.md
-|   |-- txt/
-|   |   |-- 00_contexto_ejecucion.txt
-|   |   |-- 01_backend_health.txt
-|   |   |-- 02_backend_ready_db_ia_jwt.txt
-|   |   |-- 03_frontend_http_status.txt
-|   |   |-- 04_api_docs_status.txt
-|   |   |-- 05_openapi_endpoints.txt
-|   |   |-- 06_backend_py_compile.txt
-|   |   |-- 07_login_admin_default.txt
-|   |   |-- 08_frontend_build.txt
-|   |   |-- 09_rotacion_imagen_muestra.txt
-|   |   |-- 10_backend_logs_tail.txt
-|   |   |-- 11_dashboard_data_response.txt
+|   |-- Pruebas_Funcionales/
+|   |   |-- Prueba_Login.png
+|   |   |-- Prueba_SubidaDocumento.png
+|   |   |-- Prueba_ExtraccionDatos.png
+|   |-- Pruebas_API/
+|   |   |-- POST_Auth.png
+|   |   |-- GET_Documentos.png
+|   |   |-- POST_OCR.png
+|   |-- Pruebas_Integracion/
+|   |   |-- Flujo_Completo.png
+|   |   |-- Integracion_Front_Back.png
+|   |   |-- Integracion_Back_DB.png
+|   |-- Pruebas_No_Funcionales/
+|   |   |-- Rendimiento.png
+|   |   |-- Seguridad.png
+|   |   |-- Compatibilidad.png
 |   |-- imagenes/
 |   |   |-- 01_muestra_ocr_original.jpg
 |   |   |-- 02_muestra_ocr_warped.png
@@ -92,7 +96,10 @@ BluegridOCR/
 |   |   |-- 04_muestra_ocr_contact_sheet_count.png
 |   |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
 |   |-- scripts/
-|       |-- rotar_tablilla.py
+|   |   |-- generar_evidencias_testing.py
+|   |   |-- rotar_tablilla.py
+|   |-- txt/
+|       |-- resultados .txt/.json de respaldo tecnico
 |
 |-- Gestion/
 |   |-- Integrantes.txt
@@ -520,21 +527,28 @@ Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la en
 
 ```txt
 Evidencias_Testing/
+|-- README.md
 |-- README_EVIDENCIAS.md
 |
-|-- txt/
-|   |-- 00_contexto_ejecucion.txt
-|   |-- 01_backend_health.txt
-|   |-- 02_backend_ready_db_ia_jwt.txt
-|   |-- 03_frontend_http_status.txt
-|   |-- 04_api_docs_status.txt
-|   |-- 05_openapi_endpoints.txt
-|   |-- 06_backend_py_compile.txt
-|   |-- 07_login_admin_default.txt
-|   |-- 08_frontend_build.txt
-|   |-- 09_rotacion_imagen_muestra.txt
-|   |-- 10_backend_logs_tail.txt
-|   |-- 11_dashboard_data_response.txt
+|-- Pruebas_Funcionales/
+|   |-- Prueba_Login.png
+|   |-- Prueba_SubidaDocumento.png
+|   |-- Prueba_ExtraccionDatos.png
+|
+|-- Pruebas_API/
+|   |-- POST_Auth.png
+|   |-- GET_Documentos.png
+|   |-- POST_OCR.png
+|
+|-- Pruebas_Integracion/
+|   |-- Flujo_Completo.png
+|   |-- Integracion_Front_Back.png
+|   |-- Integracion_Back_DB.png
+|
+|-- Pruebas_No_Funcionales/
+|   |-- Rendimiento.png
+|   |-- Seguridad.png
+|   |-- Compatibilidad.png
 |
 |-- imagenes/
 |   |-- 01_muestra_ocr_original.jpg
@@ -544,26 +558,31 @@ Evidencias_Testing/
 |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
 |
 |-- scripts/
+|   |-- generar_evidencias_testing.py
 |   |-- rotar_tablilla.py
+|
+|-- txt/
+|   |-- resultados .txt/.json de respaldo tecnico
 ```
 
 ### Contenido de cada prueba
 
 | Archivo | Que valida | Resultado esperado |
 | --- | --- | --- |
-| `README_EVIDENCIAS.md` | Resumen formal de evidencias, interpretacion de resultados y checklist de entrega. | Documento de apoyo para revision. |
-| `txt/00_contexto_ejecucion.txt` | Fecha, ruta del proyecto y versiones usadas de Python, Node y npm. | Contexto reproducible de ejecucion. |
-| `txt/01_backend_health.txt` | Respuesta de `GET /api/v1/health`. | Backend activo con `status=ok`. |
-| `txt/02_backend_ready_db_ia_jwt.txt` | Respuesta de `GET /api/v1/ready`. | `database=true`, `anthropic_key=true`, `jwt_secret=true`. |
-| `txt/03_frontend_http_status.txt` | Respuesta HTTP del frontend local. | `StatusCode=200`. |
-| `txt/04_api_docs_status.txt` | Disponibilidad de Swagger/FastAPI docs. | `StatusCode=200` en `/docs`. |
-| `txt/05_openapi_endpoints.txt` | Publicacion de endpoints desde `openapi.json`. | Listado de endpoints disponibles. |
-| `txt/06_backend_py_compile.txt` | Compilacion sintactica del backend. | `main.py` compila correctamente. |
-| `txt/07_login_admin_default.txt` | Comportamiento del login con credenciales documentadas. | El backend responde y valida; la base actual rechaza `admin/admin1234`. |
-| `txt/08_frontend_build.txt` | Build productivo del frontend. | `ExitCode=0`. |
-| `txt/09_rotacion_imagen_muestra.txt` | Rotacion de una imagen de muestra con Pillow. | Imagen rotada generada correctamente. |
-| `txt/10_backend_logs_tail.txt` | Logs recientes del backend durante las pruebas. | Peticiones reales registradas. |
-| `txt/11_dashboard_data_response.txt` | Acceso a ruta protegida sin token. | `401 Unauthorized`. |
+| `Pruebas_Funcionales/Prueba_Login.png` | Prueba el endpoint de login con credenciales vigentes. | Login OK con rol admin; token omitido por seguridad. |
+| `Pruebas_Funcionales/Prueba_SubidaDocumento.png` | Prueba solicitud autenticada al endpoint de carga/OCR. | OCR OK con registro generado en estado pendiente de validacion. |
+| `Pruebas_Funcionales/Prueba_ExtraccionDatos.png` | Verifica artefactos del pipeline OCR/debug. | Artefactos visuales disponibles. |
+| `Pruebas_API/POST_Auth.png` | `POST /api/v1/auth/login`. | API de autenticacion responde HTTP 200. |
+| `Pruebas_API/GET_Documentos.png` | `GET /docs`. | Swagger disponible con HTTP 200. |
+| `Pruebas_API/POST_OCR.png` | `POST /api/v1/registros`. | Endpoint OCR responde HTTP 200 con imagen de muestra. |
+| `Pruebas_Integracion/Flujo_Completo.png` | Frontend, backend, ready y OpenAPI disponibles. | Flujo tecnico OK. |
+| `Pruebas_Integracion/Integracion_Front_Back.png` | Comunicacion frontend/backend y respuesta OPTIONS. | Integracion OK. |
+| `Pruebas_Integracion/Integracion_Back_DB.png` | Backend conectado a DB via `/api/v1/ready`. | `database=true`. |
+| `Pruebas_No_Funcionales/Rendimiento.png` | Latencia de `/api/v1/health` en varias muestras. | Bajo umbral definido. |
+| `Pruebas_No_Funcionales/Seguridad.png` | Ruta protegida sin token. | `401 Unauthorized`. |
+| `Pruebas_No_Funcionales/Compatibilidad.png` | Versiones y compilacion backend. | Compatibilidad OK. |
+
+Los resultados crudos quedan en `Evidencias_Testing/txt/` como respaldo `.txt` y `.json`.
 
 ### Evidencias visuales
 
@@ -595,6 +614,12 @@ Si la orientacion correcta queda hacia el otro lado:
 python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
 ```
 
+Para regenerar toda la bateria de evidencias:
+
+```powershell
+python Evidencias_Testing/scripts/generar_evidencias_testing.py
+```
+
 ### Estado de cierre de evidencias
 
 ```txt
@@ -608,7 +633,7 @@ python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/
 [x] Evidencias visuales OCR/debug incluidas.
 [x] Script de rotacion incluido.
 [ ] Falta adjuntar la imagen exacta de tablilla compartida por el usuario como archivo local.
-[ ] Falta ejecutar OCR completo con usuario valido y token vigente.
+[x] OCR completo ejecutado con usuario valido y token vigente.
 ```
 
 ---

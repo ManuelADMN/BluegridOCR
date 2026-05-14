@@ -1,0 +1,7 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:8000/api/v1/registros",
+  "status": 200,
+  "ok": true,
+  "body_preview": "{\"id_registro\":22,\"estado\":\"pendiente_validacion\",\"zona_id\":1,\"usuario_id\":1,\"ocr_status\":\"procesado_ia_tablilla\",\"promedio_confianza\":0.9144,\"tablilla_id\":\"1\",\"celdas_detectadas\":25,\"recortes_base64\":\"omitidos_por_seguridad_y_tamano\"}"
+}

@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://127.0.0.1:8000/api/v1/ready",
+  "status": 200,
+  "ok": true,
+  "elapsed_ms": 1308.96,
+  "body_preview": "{\"status\":\"ready\",\"checks\":{\"database\":true,\"anthropic_key\":true,\"jwt_secret\":true},\"anthropic_model\":\"claude-sonnet-4-6\"}"
+}

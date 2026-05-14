@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-05-14T12:33:18",
+  "test_user": "admin@bluegrid.cl",
+  "auth": {
+    "method": "POST",
+    "url": "http://127.0.0.1:8000/api/v1/auth/login",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 1833.34,
+    "body_preview": "{\"login\": \"ok\", \"username\": \"admin@bluegrid.cl\", \"role\": \"admin\", \"token\": \"omitido_por_seguridad\"}"
+  },
+  "dashboard_auth": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/dashboard/data?fecha_desde=2026-04-14&fecha_hasta=2026-05-14",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 2128.97,
+    "body_preview": "{\"context\":{\"latest_day\":\"2026-05-14\",\"current_period\":{\"start\":\"2026-04-14\",\"end\":\"2026-05-14\",\"label\":\"14 abr - 14 may 2026\"},\"previous_period\":{\"start\":\"2026-03-14\",\"end\":\"2026-04-13\",\"label\":\"14 mar - 13 abr 2026\"}},\"summary\":{\"nidos\":257,\"cuevas_cubiertas\":186,\"hembras_con_huevos\":47,\"registros\":11,\"registros_validados\":10,\"registros_pendientes\":0,\"registros_rechazados\":1,\"sectores\":5,\"buzos\":1,\"promedio_confianza_ocr\":0.9366,\"ocupacion_pct\":72.4,\"tasa_reproductiva_pct\":18.3,\"eficiencia_val"
+  },
+  "zonas_auth": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/context/zonas",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 1297.74,
+    "body_preview": "[{\"id\":1,\"name\":\"Melinka\"},{\"id\":2,\"name\":\"Huenquillahue\"},{\"id\":3,\"name\":\"Ancud\"},{\"id\":4,\"name\":\"Melinka\"},{\"id\":5,\"name\":\"Huenquillahue\"}]"
+  },
+  "post_ocr": {
+    "method": "POST",
+    "url": "http://127.0.0.1:8000/api/v1/registros",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 40176.29,
+    "body_preview": "{\"id_registro\":22,\"estado\":\"pendiente_validacion\",\"zona_id\":1,\"usuario_id\":1,\"ocr_status\":\"procesado_ia_tablilla\",\"promedio_confianza\":0.9144,\"tablilla_id\":\"1\",\"celdas_detectadas\":25,\"recortes_base64\":\"omitidos_por_seguridad_y_tamano\"}"
+  },
+  "backend": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/health",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 35.17,
+    "body_preview": "{\"status\":\"ok\",\"service\":\"BluegridOCR API\",\"environment\":\"development\"}"
+  },
+  "ready": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/ready",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 1308.96,
+    "body_preview": "{\"status\":\"ready\",\"checks\":{\"database\":true,\"anthropic_key\":true,\"jwt_secret\":true},\"anthropic_model\":\"claude-sonnet-4-6\"}"
+  },
+  "frontend": {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173",
+    "status": 200,
+    "ok": true,
+    "elapsed_ms": 13.18,
+    "body_preview": "<!DOCTYPE html>\r\n<html lang=\"es\">\r\n  <head>\n  <script type=\"importmap\">\r\n{\r\n  \"imports\": {\r\n    \"react/\": \"https://aistudiocdn.com/react@^19.2.0/\",\r\n    \"react\": \"https://aistudiocdn.com/react@^19.2.0\",\r\n    \"react-dom/\": \"https://aistudiocdn.com/react-dom@^19.2.0/\",\r\n    \"react-dom\": \"https://aistudiocdn.com/react-dom@^19.2.0\",\r\n    \"lucide-react\": \"https://aistudiocdn.com/lucide-react@^0.554.0\",\r\n    \"recharts\": \"https://aistudiocdn.com/recharts@^2.12.7\",\r\n    \"vite\": \"https://aistudiocdn.com/"
+  },
+  "performance": {
+    "samples_ms": [
+      11.82,
+      1.55,
+      1.21,
+      10.86,
+      12.42
+    ],
+    "average_ms": 7.57,
+    "max_ms": 12.42,
+    "threshold_ms": 1000,
+    "ok": true
+  },
+  "compatibility": {
+    "python": "Python 3.13.12",
+    "node": "v24.14.0",
+    "npm": "11.2.0",
+    "backend_compile_ok": true
+  }
+}

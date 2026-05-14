@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://127.0.0.1:8000/api/v1/dashboard/data?fecha_desde=2026-04-14&fecha_hasta=2026-05-14",
+  "status": 200,
+  "ok": true,
+  "elapsed_ms": 2128.97,
+  "body_preview": "{\"context\":{\"latest_day\":\"2026-05-14\",\"current_period\":{\"start\":\"2026-04-14\",\"end\":\"2026-05-14\",\"label\":\"14 abr - 14 may 2026\"},\"previous_period\":{\"start\":\"2026-03-14\",\"end\":\"2026-04-13\",\"label\":\"14 mar - 13 abr 2026\"}},\"summary\":{\"nidos\":257,\"cuevas_cubiertas\":186,\"hembras_con_huevos\":47,\"registros\":11,\"registros_validados\":10,\"registros_pendientes\":0,\"registros_rechazados\":1,\"sectores\":5,\"buzos\":1,\"promedio_confianza_ocr\":0.9366,\"ocupacion_pct\":72.4,\"tasa_reproductiva_pct\":18.3,\"eficiencia_val"
+}

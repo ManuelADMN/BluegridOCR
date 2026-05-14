@@ -1,8 +1,10 @@
-﻿Prueba de login con credenciales documentadas:
-username=admin
-password=admin1234
+Prueba de login con credenciales vigentes:
+username=admin@bluegrid.cl
+password=<omitida_por_seguridad>
 
 Resultado:
-The remote server returned an error: (401) Unauthorized.
+HTTP 200 OK
+rol=admin
+token=<omitido_por_seguridad>
 
-Interpretacion: el backend responde y valida credenciales; la base actual no acepta el usuario admin/admin1234. Para evidencia funcional de login, ejecutar con credenciales vigentes del ambiente.
+Interpretacion: el backend autentica correctamente contra la base actual y emite token JWT valido.
