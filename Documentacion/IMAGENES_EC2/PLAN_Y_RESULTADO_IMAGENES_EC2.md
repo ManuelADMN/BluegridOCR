@@ -45,8 +45,8 @@ Defensa en profundidad: backend `require_roles(["admin","supervisor"])` (autorit
 | LE-05 | Endpoint protegido + tests RBAC | **CUMPLE** (buzo 403) | idem |
 | LE-06 | Frontend Dashboard + permiso | **CUMPLE** | `logs/img_LE06_frontend.log` |
 | LE-07 | Volumen en compose | **CUMPLE** | `logs/img_LE07_compose.log` |
-| LE-08 | RBAC real en EC2 | **PENDIENTE** (requiere deploy) | runbook abajo |
-| LE-09 | E2E real en EC2 | **PENDIENTE** (deploy + ~tokens) | runbook abajo |
+| LE-08 | RBAC real en EC2 | **CUMPLE** (buzo 403; admin/supervisor 200) | `logs/img_LE08-09_validacion_real_ec2.log` |
+| LE-09 | E2E real en EC2 | **CUMPLE** (registro 32, archivos en `/data`) | `logs/img_LE08-09_validacion_real_ec2.log` |
 | LE-11 | Revalidación final | **CUMPLE** | `logs/img_LE11_revalidacion_final.log` |
 
 ## Cambios por archivo
@@ -82,7 +82,7 @@ Defensa en profundidad: backend `require_roles(["admin","supervisor"])` (autorit
 | imagen inexistente → 404 | `test_imagen_inexistente_404` | Cumple |
 | frontend compila con el nuevo flujo | `img_LE06_frontend.log` (tsc 0, build OK) | Cumple |
 | compose monta el volumen `/data` | `img_LE07_compose.log` | Cumple |
-| subida real persiste y el supervisor ve la imagen en EC2 | — | **Pendiente (LE-09)** |
+| subida real persiste y el supervisor ve la imagen en EC2 | `img_LE08-09_validacion_real_ec2.log` (registro 32, supervisor 200, buzo 403) | Cumple |
 
 ## LE-08 / LE-09 — Validación real en EC2 (PENDIENTE: requiere deploy + ~tokens)
 No se ejecutó porque (a) el código aún no está desplegado en la EC2 (corre commit `450fe37`) y (b) la subida real consume tokens de Claude. Runbook para cerrarlo:
@@ -105,4 +105,4 @@ ls -la /opt/bluegridocr/data/registros/<id>/original.jpg
 - [x] Imagen original se persiste en `STORAGE_ROOT` y `url_imagen_original` deja de ser `url_pendiente`.
 - [x] Vista Dashboard (supervisor) muestra `<img>` real para admin/supervisor.
 - [x] Volumen configurado (persiste a `--force-recreate`/rebuild).
-- [ ] **PENDIENTE**: validación real en EC2 (admin/supervisor ven, buzo 403, archivo en disco) — gated por deploy + tokens.
+- [x] **Validación real en EC2 (2026-06-25)**: desplegado `3b38ac6` en `ec2-52-54-141-187`; registro 32 con `original.jpg`+`warped.png` en `/opt/bluegridocr/data`; admin/supervisor **200**, buzo **403**, también por el proxy del frontend (:3000). Ver `logs/img_LE08-09_validacion_real_ec2.log`.

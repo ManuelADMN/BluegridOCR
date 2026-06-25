@@ -93,10 +93,11 @@ def test_imagen_buzo_403(storage_root, jwt_secret):
     assert r.status_code == 403  # <-- requisito central: el buzo NO ve imágenes
 
 
-def test_imagen_sin_token_403(storage_root, jwt_secret):
+def test_imagen_sin_token_bloqueado(storage_root, jwt_secret):
     client = TestClient(app)
     r = client.get("/api/v1/registros/5/imagen?tipo=original")
-    assert r.status_code == 403  # HTTPBearer sin credenciales
+    # HTTPBearer sin credenciales: 401 o 403 según versión de FastAPI; ambos bloquean.
+    assert r.status_code in (401, 403)
 
 
 def test_imagen_inexistente_404(storage_root, jwt_secret):
