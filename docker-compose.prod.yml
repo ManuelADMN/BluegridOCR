@@ -23,7 +23,10 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3001}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      # Opción B: el backend NO se expone a internet. El frontend lo alcanza por la red
+      # interna de Docker (host "backend"). Se publica solo en 127.0.0.1 para depurar en la
+      # propia EC2 (curl http://localhost:8000/...). Para exponerlo de nuevo: "${BACKEND_PORT:-8000}:8000".
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).read()"]
       interval: 30s
@@ -39,7 +42,11 @@ services:
     container_name: bluegridocr_frontend_prod
     restart: unless-stopped
     environment:
-      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+      # Opción B (proxy interno): nginx activa nginx.azure.conf y reenvía /api/ al
+      # contenedor backend por la red interna de Docker. El navegador llama same-origin
+      # (/api/v1/...), por eso API_BASE_URL queda vacío. No expone 8000 ni usa CORS.
+      ENABLE_INTERNAL_API_PROXY: "${ENABLE_INTERNAL_API_PROXY:-true}"
+      API_BASE_URL: "${API_BASE_URL-}"
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     depends_on:
