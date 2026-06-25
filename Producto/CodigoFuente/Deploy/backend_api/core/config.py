@@ -12,6 +12,11 @@ class Settings:
     ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
     ANTHROPIC_OCR_AUDIT_MODEL: str = os.getenv("ANTHROPIC_OCR_AUDIT_MODEL", "claude-opus-4-1-20250805")
 
+    # Modo del motor OCR. "segmented" (default) = pipeline actual de recortes/contact sheets.
+    # "full_rectangle" = enviar a Claude una sola imagen del rectángulo completo rectificado
+    # y rotado para lectura humana. No cambia el comportamiento por defecto.
+    OCR_MODE: str = os.getenv("OCR_MODE", "segmented")
+
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
