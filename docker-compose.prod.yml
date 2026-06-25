@@ -22,6 +22,12 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3001}
+      # Almacenamiento de imágenes en disco (reemplazo de Blob Storage).
+      STORAGE_ROOT: ${STORAGE_ROOT:-/data}
+    volumes:
+      # Bind mount: las imágenes persisten en la EC2 y sobreviven a rebuild/--force-recreate.
+      # Crear en la EC2:  mkdir -p /opt/bluegridocr/data
+      - ${IMAGES_HOST_DIR:-/opt/bluegridocr/data}:/data
     ports:
       # Opción B: el backend NO se expone a internet. El frontend lo alcanza por la red
       # interna de Docker (host "backend"). Se publica solo en 127.0.0.1 para depurar en la

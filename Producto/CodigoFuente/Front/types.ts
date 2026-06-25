@@ -12,6 +12,7 @@ export type Permission =
   | 'users:create'
   | 'settings:manage'
   | 'analytics:buzo_view'
+  | 'images:view'
   | 'admin:all';
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -28,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'dashboard:view',
     'ocr:digitalize',
     'analytics:buzo_view',
+    'images:view',
   ],
   buzo: [
     'ocr:digitalize',
