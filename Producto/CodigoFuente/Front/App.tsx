@@ -344,8 +344,10 @@ export default function App() {
       img.onload = () => {
         URL.revokeObjectURL(url);
 
-        const MAX_PX  = 1600;
-        const QUALITY = 0.85;
+        // Calidad/resolución más altas para preservar los 4 puntos rojos de las esquinas:
+        // la compresión agresiva los desatura y rompía la detección/rectificado (warp) en backend.
+        const MAX_PX  = 1920;
+        const QUALITY = 0.92;
         const swapped = rotation === 90 || rotation === 270;
 
         // Escalar sobre las dimensiones originales
@@ -529,8 +531,11 @@ export default function App() {
       label: 'Digitalización',
       icon: ScanLine,
       onClick: () => {
+        // Navegar al módulo OCR sin descartar una digitalización en progreso.
+        // Si el editor de matriz está abierto y aún no se guarda, se conserva;
+        // solo se vuelve a la pantalla de carga cuando no hay matriz activa.
         setCurrentModule('ocr');
-        setView('upload');
+        if (!(view === 'editor' && ocrData)) setView('upload');
       },
     },
     canViewBuzoAnalytics && {
