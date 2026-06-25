@@ -1,0 +1,34 @@
+﻿BluegridOCR GitHub Actions readiness
+Generated: 2026-06-25T00:05:00
+
+== workflow files ==
+.github/workflows/ci-bluegrid.yml: PRESENTE
+.github/workflows/aws-ecr-ready.yml: PRESENTE
+
+== yaml parse ==
+cmd: python -c "import yaml ..."
+result: yaml ok
+status: CUMPLE
+
+== compose config ==
+cmd: docker compose -f docker-compose.prod.yml config
+result: exit_code 0
+status: CUMPLE
+
+== OIDC check ==
+aws-ecr-ready.yml includes:
+- permissions: id-token: write
+- permissions: contents: read
+- aws-actions/configure-aws-credentials@v4
+- aws-actions/amazon-ecr-login@v2
+status: CUMPLE
+
+== permanent AWS keys ==
+AWS_ACCESS_KEY_ID: NO USADO
+AWS_SECRET_ACCESS_KEY: NO USADO
+status: CUMPLE
+
+== required GitHub variables ==
+AWS_REGION: PENDIENTE
+AWS_ROLE_ARN: PENDIENTE
+ECR_REPOSITORY: PENDIENTE

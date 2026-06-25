@@ -1,0 +1,53 @@
+services:
+  backend:
+    build:
+      context: ./Producto/CodigoFuente/Deploy/backend_api
+      dockerfile: Dockerfile
+    image: bluegridocr-backend:local
+    container_name: bluegridocr_backend_prod
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Santiago}
+      HOST: 0.0.0.0
+      PORT: 8000
+      HTTPS_ENABLED: ${HTTPS_ENABLED:-false}
+      DATABASE_URL: ${DATABASE_URL:-}
+      SUPABASE_KEY: ${SUPABASE_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-not-configured}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
+      ANTHROPIC_OCR_AUDIT_MODEL: ${ANTHROPIC_OCR_AUDIT_MODEL:-claude-opus-4-8}
+      OCR_MODE: ${OCR_MODE:-segmented}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-not-configured}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3001}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./Producto/CodigoFuente/Front
+      dockerfile: Dockerfile
+    image: bluegridocr-frontend:local
+    container_name: bluegridocr_frontend_prod
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

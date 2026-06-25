@@ -1,0 +1,49 @@
+﻿BluegridOCR local validation - sanitized evidence
+Generated: 2026-06-25T00:02:00
+
+== frontend npm install ==
+dir: Producto/CodigoFuente/Front
+cmd: npm install
+result: up to date, audited 316 packages
+exit_code: 0
+status: CUMPLE
+notes: npm reported 9 vulnerabilities (1 low, 5 moderate, 3 high). Review with npm audit before production.
+
+== frontend npm run build ==
+dir: Producto/CodigoFuente/Front
+cmd: npm run build
+result: tsc && vite build completed. 2287 modules transformed. dist/index.html and assets generated.
+exit_code: 0
+status: CUMPLE
+notes: Vite warned that one chunk is larger than 500 kB after minification. This is not a build failure.
+
+== frontend npm run test ==
+dir: Producto/CodigoFuente/Front
+cmd: npm run test
+result: Karma executed 21 of 21 tests successfully.
+summary: TOTAL: 21 SUCCESS
+exit_code: 0
+status: CUMPLE
+
+== backend python version ==
+dir: Producto/CodigoFuente/Deploy/backend_api
+cmd: python --version
+result: Python 3.13.12
+exit_code: 0
+status: CUMPLE
+notes: Dockerfile uses python:3.11-slim; CI pins Python 3.11.
+
+== backend pip install requirements ==
+dir: Producto/CodigoFuente/Deploy/backend_api
+cmd: python -m pip install -r requirements.txt
+result: requirements satisfied/installed
+exit_code: 0
+status: CUMPLE
+notes: pip warned about invalid local distribution ~ip in user site-packages; not a project test failure.
+
+== backend pytest ==
+dir: Producto/CodigoFuente/Deploy/backend_api
+cmd: python -m pytest -q
+result: 10 passed in 6.50s
+exit_code: 0
+status: CUMPLE
