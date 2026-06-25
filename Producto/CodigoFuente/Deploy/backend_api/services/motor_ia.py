@@ -17,6 +17,12 @@ from core.logger import logger
 CLAUDE_MODEL = settings.ANTHROPIC_MODEL
 CLAUDE_OCR_AUDIT_MODEL = settings.ANTHROPIC_OCR_AUDIT_MODEL
 
+
+def _message_options_for_model(model: str) -> dict:
+    if model in {"claude-opus-4-8", "claude-opus-4-7", "claude-fable-5", "claude-mythos-5"}:
+        return {}
+    return {"temperature": 0}
+
 COL_LABELS = [
     "N Nidos con Huevos",
     "N Cuevas Cubiertas",
@@ -28,9 +34,11 @@ COL_LABELS = [
 
 class Grid5x5Engine:
     def __init__(self):
-        self.lower_red1 = np.array([0, 120, 70], dtype=np.uint8)
+        # Umbrales relajados (S/V mas bajos) para que los puntos rojos sobrevivan la
+        # compresion JPEG del frontend, que desatura el rojo y disparaba fallbacks falsos.
+        self.lower_red1 = np.array([0, 90, 55], dtype=np.uint8)
         self.upper_red1 = np.array([10, 255, 255], dtype=np.uint8)
-        self.lower_red2 = np.array([170, 120, 70], dtype=np.uint8)
+        self.lower_red2 = np.array([170, 90, 55], dtype=np.uint8)
         self.upper_red2 = np.array([180, 255, 255], dtype=np.uint8)
 
         # ratios base estables del OCR anterior
@@ -112,6 +120,17 @@ class Grid5x5Engine:
         hA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
         hB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
         maxH = max(int(round(max(int(round(hA)), int(round(hB))) * factor)), 50)
+
+        # Rechazo de warp degenerado: la tablilla rectificada es apaisada (W/H ~ 1.3-1.4).
+        # Si sale vertical/angosta (p.ej. 269x854, aspect 0.31) los 4 puntos se eligieron mal;
+        # devolver None obliga al fallback robusto en vez de pasar una lectura distorsionada.
+        aspect = maxW / float(maxH)
+        if aspect < 0.95:
+            logger.warning(
+                "[MOTOR_IA] warp: relacion de aspecto degenerada (%.2f, %dx%d) -> descartado, usando fallback",
+                aspect, maxW, maxH,
+            )
+            return None, None, None, None, "warp_degenerado_aspecto"
 
         src = np.array([tl, tr, br, bl], dtype=np.float32)
         dst = np.array([[0, 0], [maxW - 1, 0], [maxW - 1, maxH - 1], [0, maxH - 1]], dtype=np.float32)
@@ -700,6 +719,33 @@ def normalize_tablilla_id(value) -> str:
     return re.sub(r"[^A-Z0-9-]", "", raw)
 
 
+def enforce_x_exclusivity(matriz):
+    """
+    Regla de negocio: C3 (hembra en nido) y C4 (hembra en cueva) son EXCLUYENTES por fila.
+    Una hembra se captura en un solo lado (nido O cueva), nunca en ambos; el modelo de datos
+    guarda un unico campo `hembra` (1=nido, 2=cueva), por lo que una doble X se perderia.
+
+    Si una fila trae "X" en C3 y C4 a la vez, conserva la de mayor confianza y limpia la otra.
+    Modifica la matriz in-place y la devuelve.
+    """
+    by_ref = {item.get("ref_id"): item for item in matriz}
+    for fila in range(1, 6):
+        c3 = by_ref.get(f"F{fila}C3")
+        c4 = by_ref.get(f"F{fila}C4")
+        if not (c3 and c4):
+            continue
+        if str(c3.get("valor", "")).upper() == "X" and str(c4.get("valor", "")).upper() == "X":
+            keep_c3 = float(c3.get("confianza", 0.0) or 0.0) >= float(c4.get("confianza", 0.0) or 0.0)
+            loser = c4 if keep_c3 else c3
+            loser["valor"] = ""
+            loser["valor_original"] = ""
+            logger.info(
+                "[MOTOR_IA] Regla X excluyente: fila %d tenia X en C3 y C4 -> se conserva %s, se limpia la otra",
+                fila, "C3" if keep_c3 else "C4",
+            )
+    return matriz
+
+
 def build_prompt():
     return """
 Eres un lector visual de tablillas acuicolas Bluegrid. Tu unica tarea es transcribir una grilla fija de 5 filas x 5 columnas.
@@ -763,12 +809,15 @@ Como leer C3 y C4:
 - Devuelve "" si no hay X oscura.
 - No devuelvas numeros en C3 ni C4.
 - Una diagonal sola, una sombra o una parte del borde no son X.
+- REGLA DE EXCLUSIVIDAD POR FILA: C3 (hembra en nido) y C4 (hembra en cueva) son mutuamente excluyentes. Una hembra se captura en un solo lado: nido O cueva, nunca en ambos.
+- Por lo tanto, en una misma fila puede haber como maximo UNA X entre C3 y C4. NUNCA marques X en C3 y C4 de la misma fila.
+- Si parece haber X en ambas celdas de la fila, deja la X solo en la que tenga la marca mas clara/oscura y pon "" en la otra.
 
 Checklist obligatorio antes de responder:
 1. Verifica que hay exactamente 25 celdas, todas las combinaciones F1C1..F5C5.
 2. Lee el identificador fisico de la pestaña/lateral de la tablilla. Si ves T1, T-1, TAB1 o TAB-1, devuelve "1". Si ves T2, devuelve "2". Devuelve siempre el ID canonico sin prefijo T/TAB.
 3. Verifica que C1, C2 y C5 solo tengan enteros positivos o "".
-4. Verifica que C3 y C4 solo tengan "X" o "".
+4. Verifica que C3 y C4 solo tengan "X" o "", y que en cada fila NO haya X en C3 y C4 a la vez (maximo una X por fila entre ambas).
 5. Si hay duda real en una celda, devuelve tu mejor lectura visible y usa confianza menor, entre 0.45 y 0.70.
 6. Si no hay marca visible, devuelve "" con confianza alta.
 
@@ -827,9 +876,94 @@ Devuelve SOLO JSON valido con esta forma exacta:
 }
 """.strip()
 
+def rotate_warped_for_human_reading(warped):
+    """
+    Función pura: recibe la imagen `warped` (rectángulo rectificado por Grid5x5Engine)
+    y devuelve una imagen rotada para lectura humana.
+
+    Objetivo de orientación:
+    - 5 filas horizontales de arriba hacia abajo (fila 1 .. fila 5).
+    - 5 columnas de izquierda a derecha (C1 .. C5).
+
+    Para el caso actual el `warped` queda vertical (alto > ancho), por lo que rotarlo
+    90 grados en sentido horario deja el rectángulo legible y apaisado (ancho > alto).
+    No toca el pipeline de recortes/contact sheets ni la base de datos.
+    """
+    if warped is None or getattr(warped, "size", 0) == 0:
+        return warped
+    return cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
+
+
+def build_full_rectangle_prompt():
+    return """
+Eres un lector visual de tablillas acuicolas Bluegrid. Recibiras UNA sola imagen: el
+rectangulo completo de la tablilla ya rectificado y rotado para lectura humana.
+
+Estructura fija de la grilla en esta imagen:
+- Hay 5 filas horizontales: fila 1 a fila 5, de ARRIBA hacia ABAJO.
+- Hay 5 columnas verticales: columna 1 a columna 5, de IZQUIERDA a DERECHA.
+- La interseccion fila F columna C es la celda FxCy (por ejemplo F1C1 arriba-izquierda,
+  F5C5 abajo-derecha). Debes leer exactamente 25 celdas.
+
+Significado de cada columna:
+- C1 = Nidos con huevos. Es un conteo por trazos/figuras.
+- C2 = Cuevas cubiertas. Es un conteo por trazos/figuras.
+- C3 = Captura hembra en nido. Es booleana: solo "X" o "".
+- C4 = Captura hembra en cueva. Es booleana: solo "X" o "".
+- C5 = Total pulpos. Es un conteo por trazos/figuras.
+
+Reglas criticas de lectura:
+- Cuenta SOLO trazos oscuros de lapiz/grafito dentro de cada celda.
+- Ignora por completo el azul (lineas, bordes, marco, texto azul), los bordes de celda,
+  los puntos rojos, las sombras, el ruido de compresion y el fondo.
+- No inventes valores para completar una fila. Si una celda no tiene trazos oscuros
+  internos, devuelve "".
+
+Como convertir marcas a numero en C1, C2 y C5 (NO son digitos manuscritos, son conteos):
+- linea suelta = 1
+- L, V o angulo (dos palitos) = 2
+- U, C o N (tres palitos) = 3
+- figura cerrada (cuadro / o / 0) = 4
+- figura cerrada con linea interna o diagonal = 5
+- si hay varias figuras o figuras + palitos en la misma celda, SUMA todo.
+- el resultado puede ser mayor a 5. No limites el conteo.
+- nunca respondas "X" en C1, C2 ni C5.
+
+Como leer C3 y C4 (booleanas):
+- Devuelve "X" si hay una X oscura clara dentro de la celda.
+- Devuelve "" si no hay X oscura.
+- No devuelvas numeros en C3 ni C4.
+- REGLA DE EXCLUSIVIDAD POR FILA: C3 (hembra en nido) y C4 (hembra en cueva) son mutuamente excluyentes. Una hembra se captura en un solo lado: nido O cueva, nunca en ambos.
+- En una misma fila puede haber como maximo UNA X entre C3 y C4. NUNCA marques X en C3 y C4 de la misma fila.
+- Si parece haber X en ambas, deja la X solo en la celda con la marca mas clara y pon "" en la otra.
+
+Checklist antes de responder:
+1. Verifica que entregas exactamente 25 celdas: todas las combinaciones F1C1..F5C5.
+2. C1, C2 y C5 solo enteros positivos o "".
+3. C3 y C4 solo "X" o "", y en cada fila NO hay X en C3 y C4 a la vez.
+4. Si hay duda real, entrega tu mejor lectura visible con confianza menor (0.45 a 0.70).
+
+Responde SOLO JSON valido, sin markdown, sin explicaciones, con esta forma exacta:
+{
+  "tablilla_id": "",
+  "cells": [
+    {"fila": 1, "col": 1, "valor": "3", "confianza": 0.92},
+    {"fila": 1, "col": 2, "valor": "4", "confianza": 0.93},
+    {"fila": 1, "col": 3, "valor": "X", "confianza": 0.99},
+    {"fila": 1, "col": 4, "valor": "", "confianza": 0.97},
+    {"fila": 1, "col": 5, "valor": "2", "confianza": 0.91}
+  ]
+}
+""".strip()
+
+
 class ClaudeGridOCRService:
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # Fallback de placeholder para permitir construir el servicio en entornos de test
+        # sin credencial real. Una key vacia haria fallar la construccion del cliente.
+        # Esto NO habilita llamadas reales: con placeholder cualquier request fallaria igual.
+        api_key = settings.ANTHROPIC_API_KEY or "sk-ant-placeholder-no-usar-en-tests"
+        self.client = anthropic.Anthropic(api_key=api_key)
         self.grid = Grid5x5Engine()
 
     def _call_claude(self, original_b64, warped_b64, sheet_b64, ink_sheet_b64, count_sheet_b64, legend_b64, excepciones=None):
@@ -905,9 +1039,9 @@ class ClaudeGridOCRService:
         response = self.client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=2200,
-            temperature=0,
             system=build_prompt(),
             messages=[{"role": "user", "content": content}],
+            **_message_options_for_model(CLAUDE_MODEL),
         )
         elapsed = round(time.time() - t0, 2)
         resp_text = response.content[0].text if response.content else ""
@@ -926,7 +1060,6 @@ class ClaudeGridOCRService:
             response = self.client.messages.create(
                 model=model,
                 max_tokens=1600,
-                temperature=0,
                 system=build_audit_prompt(),
                 messages=[
                     {
@@ -944,6 +1077,7 @@ class ClaudeGridOCRService:
                         ],
                     }
                 ],
+                **_message_options_for_model(model),
             )
             return response.content[0].text if response.content else ""
 
@@ -954,7 +1088,165 @@ class ClaudeGridOCRService:
                 raise
             return run(CLAUDE_MODEL), CLAUDE_MODEL
 
-    def procesar_imagen(self, img_bytes, excepciones=None):
+    def _call_claude_full_rectangle(self, full_rectangle_b64, excepciones=None):
+        """
+        Llamada AISLADA para el modo full_rectangle: envia a Claude una sola imagen
+        (el rectangulo completo rectificado y rotado para lectura humana).
+        No se ejecuta en los tests: estos mockean este metodo.
+        """
+        logger.info("[MOTOR_IA] _call_claude_full_rectangle: modelo=%s", CLAUDE_MODEL)
+        content = [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": full_rectangle_b64},
+            },
+        ]
+
+        if excepciones:
+            exc_con_imagen = [e for e in excepciones if e.get("recorte_b64")]
+            if exc_con_imagen:
+                content.append({
+                    "type": "text",
+                    "text": (
+                        "PATRON DE ESCRITURA DE ESTE BUZO (ejemplos reales corregidos por el operador). "
+                        "Si en la tablilla ves una forma similar, usa ese valor como referencia prioritaria."
+                    ),
+                })
+                for exc in exc_con_imagen[:10]:
+                    content.append({
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/png", "data": exc["recorte_b64"]},
+                    })
+                    content.append({
+                        "type": "text",
+                        "text": f"Esta forma significa: {exc['valor_corregido']} (el OCR lo leyo como {exc['valor_original']})",
+                    })
+
+        content.append({
+            "type": "text",
+            "text": (
+                "Lee la tablilla completa desde esta unica imagen rectificada. "
+                "Hay 5 filas (arriba->abajo) y 5 columnas (izquierda->derecha) C1..C5. "
+                "En C1, C2 y C5 cuenta segmentos oscuros de grafito; no leas digitos manuscritos. "
+                "En C3 y C4 solo marca X o vacio porque son columnas booleanas. "
+                "Ignora completamente azul, bordes, puntos rojos, sombras y fondo. "
+                "Devuelve SOLO el JSON exacto con 25 celdas."
+            ),
+        })
+
+        t0 = time.time()
+        response = self.client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=2200,
+            system=build_full_rectangle_prompt(),
+            messages=[{"role": "user", "content": content}],
+            **_message_options_for_model(CLAUDE_MODEL),
+        )
+        elapsed = round(time.time() - t0, 2)
+        resp_text = response.content[0].text if response.content else ""
+        logger.info("[MOTOR_IA] full_rectangle completado en %.2fs  respuesta=%d chars", elapsed, len(resp_text))
+        return resp_text
+
+    def _read_full_rectangle_image(self, image_to_send, grid_data, excepciones, t_total,
+                                   status_ok, status_fallback, ocr_mode_label="full_rectangle"):
+        """
+        Lee UNA sola imagen completa con el prompt full_rectangle y arma el resultado en
+        el formato estandar de `matriz`. Devuelve el dict, o None si el parseo falla o no
+        llegan exactamente 25 celdas F1C1..F5C5 (para que el llamador caiga a otro camino).
+        No trocea a ciegas: por eso sirve tanto para el modo full_rectangle explicito como
+        para el fallback robusto cuando el warp no es confiable.
+        """
+        try:
+            full_rectangle_b64 = cv2_to_b64(image_to_send)
+
+            raw = self._call_claude_full_rectangle(full_rectangle_b64, excepciones=excepciones)
+            parsed = extract_json(raw)
+
+            cells = parsed.get("cells", [])
+            by_key = {}
+            for item in cells:
+                try:
+                    fila = int(item.get("fila"))
+                    col = int(item.get("col"))
+                    by_key[(fila, col)] = item
+                except Exception:
+                    pass
+
+            expected_keys = {(f, c) for f in range(1, 6) for c in range(1, 6)}
+            if set(by_key.keys()) != expected_keys:
+                logger.warning(
+                    "[MOTOR_IA] full_rectangle: no devolvio exactamente 25 celdas F1C1..F5C5 (recibidas=%d) -> otro camino",
+                    len(by_key),
+                )
+                return None
+
+            tablilla_id_raw = parsed.get("tablilla_id")
+            tablilla_id = normalize_tablilla_id(tablilla_id_raw)
+
+            crops_key = {(item["fila"], item["col"]): item["crop"] for item in grid_data["crops"]}
+
+            matriz = []
+            confidences = []
+            for fila in range(1, 6):
+                for col in range(1, 6):
+                    item = by_key.get((fila, col), {})
+                    valor = normalize_cell_value(item.get("valor", ""), col)
+                    confianza = normalize_confidence(item.get("confianza", 0.0))
+                    confidences.append(confianza)
+
+                    crop_raw = crops_key.get((fila, col))
+                    recorte_b64 = cv2_to_b64(_prepare_crop_for_model(crop_raw)) if crop_raw is not None else ""
+
+                    matriz.append({
+                        "fila": f"Fila {fila}",
+                        "col": col - 1,
+                        "valor": valor,
+                        "valor_original": valor,
+                        "confianza": round(confianza, 4),
+                        "ref_id": f"F{fila}C{col}",
+                        "recorte_b64": recorte_b64,
+                    })
+
+            enforce_x_exclusivity(matriz)
+            promedio = round(float(sum(confidences) / len(confidences)), 4) if confidences else 0.0
+            status_final = status_fallback if grid_data["fallback"] else status_ok
+            logger.info("[MOTOR_IA] Resultado full_rectangle: status=%s  confianza=%.4f  celdas=%d  tiempo_total=%.2fs",
+                        status_final, promedio, len(matriz), time.time() - t_total)
+            return {
+                "status": status_final,
+                "promedio_confianza": promedio,
+                "tablilla_id": tablilla_id,
+                "tablilla_id_raw": tablilla_id_raw,
+                "matriz": matriz,
+                "debug": {
+                    "ocr_mode": ocr_mode_label,
+                    "full_rectangle_b64": full_rectangle_b64,
+                    "raw_full_rectangle_output": raw,
+                    "full_rectangle_model": CLAUDE_MODEL,
+                    "grid_preview_b64": cv2_to_b64(grid_data["preview"]),
+                    "warped_b64": cv2_to_b64(grid_data["warped"]),
+                    "grid_status": grid_data["status"],
+                    "fallback": grid_data["fallback"],
+                },
+            }
+        except Exception as exc:
+            logger.warning("[MOTOR_IA] lectura full_rectangle fallo (%s)", exc)
+            return None
+
+    def _procesar_full_rectangle(self, img, grid_data, excepciones, t_total):
+        """
+        Modo full_rectangle explicito: rota el `warped` rectificado para lectura humana y
+        lo manda como una sola imagen. Devuelve dict o None (para caer al modo segmentado).
+        """
+        readable = rotate_warped_for_human_reading(grid_data["warped"])
+        return self._read_full_rectangle_image(
+            readable, grid_data, excepciones, t_total,
+            status_ok="procesado_ia_full_rectangle",
+            status_fallback="procesado_ia_full_rectangle_fallback",
+            ocr_mode_label="full_rectangle",
+        )
+
+    def procesar_imagen(self, img_bytes, excepciones=None, ocr_mode=None):
         logger.info("[MOTOR_IA] ══ Inicio procesamiento OCR ═══════════════════")
         logger.info("[MOTOR_IA] Tamaño imagen: %.1f KB  excepciones_buzo=%d",
                     len(img_bytes) / 1024, len(excepciones) if excepciones else 0)
@@ -973,6 +1265,36 @@ class ClaudeGridOCRService:
 
         grid_data = self.grid.build_grid(img)
 
+        mode = str(ocr_mode or settings.OCR_MODE or "segmented").strip().lower()
+        logger.info("[MOTOR_IA] OCR_MODE=%s  warp_fallback=%s", mode, grid_data["fallback"])
+
+        # Modo full_rectangle explicito.
+        if mode == "full_rectangle":
+            resultado = self._procesar_full_rectangle(img, grid_data, excepciones, t_total)
+            if resultado is not None:
+                return resultado
+            logger.info("[MOTOR_IA] full_rectangle no concluyo -> troceo segmentado")
+            return self._procesar_segmented(img, grid_data, excepciones, t_total)
+
+        # Modo segmentado (default). Si NO hay warp confiable, trocear a ciegas con los ratios
+        # del rectangulo rectificado produce celdas desalineadas (la causa de los fallbacks
+        # malos). En ese caso leemos la imagen completa, que es coherente, y solo como ultimo
+        # recurso caemos al troceo.
+        if grid_data["fallback"]:
+            logger.info("[MOTOR_IA] Sin warp confiable -> lectura de imagen completa (fallback robusto)")
+            resultado = self._read_full_rectangle_image(
+                img, grid_data, excepciones, t_total,
+                status_ok="procesado_ia_imagen_completa",
+                status_fallback="procesado_ia_tablilla_fallback",
+                ocr_mode_label="full_rectangle_fallback",
+            )
+            if resultado is not None:
+                return resultado
+            logger.info("[MOTOR_IA] lectura de imagen completa no concluyo -> troceo segmentado (ultimo recurso)")
+
+        return self._procesar_segmented(img, grid_data, excepciones, t_total)
+
+    def _procesar_segmented(self, img, grid_data, excepciones, t_total):
         original_model = img.copy()
         warped_model = grid_data["warped"].copy()
         original_b64 = cv2_to_b64(original_model)
@@ -1059,6 +1381,8 @@ class ClaudeGridOCRService:
         except Exception as exc:
             audit_raw = f"audit_skipped_or_failed: {exc}"
 
+        enforce_x_exclusivity(matriz)
+
         status_final = "procesado_ia_tablilla" if not grid_data["fallback"] else "procesado_ia_tablilla_fallback"
         logger.info("[MOTOR_IA] Resultado final: status=%s  confianza=%.4f  tablilla_id=%s  celdas=%d  tiempo_total=%.2fs",
                     status_final, promedio, parsed.get("tablilla_id"), len(matriz), time.time() - t_total)
@@ -1070,6 +1394,7 @@ class ClaudeGridOCRService:
             "tablilla_id_raw": parsed.get("tablilla_id_raw"),
             "matriz": matriz,
             "debug": {
+                "ocr_mode": "segmented",
                 "grid_preview_b64": cv2_to_b64(grid_data["preview"]),
                 "warped_b64": warped_b64,
                 "contact_sheet_b64": sheet_b64,
@@ -1088,5 +1413,5 @@ class ClaudeGridOCRService:
 _service = ClaudeGridOCRService()
 
 
-def procesar_registro_ocr(img_bytes: bytes, excepciones=None):
-    return _service.procesar_imagen(img_bytes, excepciones=excepciones)
+def procesar_registro_ocr(img_bytes: bytes, excepciones=None, ocr_mode=None):
+    return _service.procesar_imagen(img_bytes, excepciones=excepciones, ocr_mode=ocr_mode)
