@@ -1,0 +1,104 @@
+name: Bluegrid CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  FRONTEND_DIR: Producto/CodigoFuente/Front
+  BACKEND_DIR: Producto/CodigoFuente/Deploy/backend_api
+  COMPOSE_FILE: docker-compose.prod.yml
+
+jobs:
+  validate:
+    name: Build, test and Docker validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect project structure
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$FRONTEND_DIR/package.json" && echo "frontend=true" >> "$GITHUB_OUTPUT" || echo "frontend=false" >> "$GITHUB_OUTPUT"
+          test -f "$BACKEND_DIR/requirements.txt" && echo "backend=true" >> "$GITHUB_OUTPUT" || echo "backend=false" >> "$GITHUB_OUTPUT"
+          test -f "$COMPOSE_FILE" && echo "compose=true" >> "$GITHUB_OUTPUT" || echo "compose=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Bluegrid CI discovery"
+            echo "- Frontend: $FRONTEND_DIR => $(test -f "$FRONTEND_DIR/package.json" && echo CUMPLE || echo NO_ENCONTRADO)"
+            echo "- Backend: $BACKEND_DIR => $(test -f "$BACKEND_DIR/requirements.txt" && echo CUMPLE || echo NO_ENCONTRADO)"
+            echo "- Compose: $COMPOSE_FILE => $(test -f "$COMPOSE_FILE" && echo CUMPLE || echo NO_ENCONTRADO)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        if: steps.detect.outputs.frontend == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: Producto/CodigoFuente/Front/package-lock.json
+
+      - name: Install frontend dependencies
+        if: steps.detect.outputs.frontend == 'true'
+        working-directory: Producto/CodigoFuente/Front
+        run: npm ci
+
+      - name: Run frontend tests
+        if: steps.detect.outputs.frontend == 'true'
+        working-directory: Producto/CodigoFuente/Front
+        run: xvfb-run -a npm run test
+
+      - name: Build frontend
+        if: steps.detect.outputs.frontend == 'true'
+        working-directory: Producto/CodigoFuente/Front
+        run: npm run build
+
+      - name: Setup Python
+        if: steps.detect.outputs.backend == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install backend dependencies
+        if: steps.detect.outputs.backend == 'true'
+        working-directory: Producto/CodigoFuente/Deploy/backend_api
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run backend tests
+        if: steps.detect.outputs.backend == 'true'
+        working-directory: Producto/CodigoFuente/Deploy/backend_api
+        env:
+          ANTHROPIC_API_KEY: not-configured
+          JWT_SECRET_KEY: ci-not-secret
+          DATABASE_URL: ""
+        run: python -m pytest -q
+
+      - name: Validate Docker Compose
+        if: steps.detect.outputs.compose == 'true'
+        run: docker compose -f "$COMPOSE_FILE" config
+
+      - name: Build Docker images
+        if: steps.detect.outputs.compose == 'true'
+        run: docker compose -f "$COMPOSE_FILE" build
+
+      - name: CI summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Bluegrid CI result"
+            echo "- Frontend install/test/build: ${{ steps.detect.outputs.frontend == 'true' && 'ejecutado' || 'NO_ENCONTRADO' }}"
+            echo "- Backend install/test: ${{ steps.detect.outputs.backend == 'true' && 'ejecutado' || 'NO_ENCONTRADO' }}"
+            echo "- Docker compose config/build: ${{ steps.detect.outputs.compose == 'true' && 'ejecutado' || 'NO_ENCONTRADO' }}"
+            echo "- AWS: NO APLICA en este workflow"
+          } >> "$GITHUB_STEP_SUMMARY"

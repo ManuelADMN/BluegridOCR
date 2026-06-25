@@ -1,0 +1,115 @@
+name: Bluegrid AWS ECR Ready
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  BACKEND_CONTEXT: Producto/CodigoFuente/Deploy/backend_api
+  FRONTEND_CONTEXT: Producto/CodigoFuente/Front
+
+jobs:
+  ecr:
+    name: Build and push images to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required GitHub variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in AWS_REGION AWS_ROLE_ARN ECR_REPOSITORY; do
+            value="${!name:-}"
+            if [ -z "$value" ]; then
+              echo "::error::$name no esta configurada en Settings -> Secrets and variables -> Actions -> Variables"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            {
+              echo "## AWS ECR Ready"
+              echo "NO CUMPLE: faltan variables de GitHub Actions."
+              echo "- AWS_REGION"
+              echo "- AWS_ROLE_ARN"
+              echo "- ECR_REPOSITORY"
+              echo ""
+              echo "No uses AWS_ACCESS_KEY_ID ni AWS_SECRET_ACCESS_KEY. Este workflow usa OIDC."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Ensure ECR repository exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 || \
+            aws ecr create-repository --repository-name "$ECR_REPOSITORY" >/dev/null
+        env:
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        if: hashFiles('Producto/CodigoFuente/Deploy/backend_api/Dockerfile') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:backend-$GITHUB_SHA"
+          docker build -t "$IMAGE" "$BACKEND_CONTEXT"
+          docker push "$IMAGE"
+          echo "BACKEND_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+      - name: Build and push frontend image
+        if: hashFiles('Producto/CodigoFuente/Front/Dockerfile') != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:frontend-$GITHUB_SHA"
+          docker build -t "$IMAGE" "$FRONTEND_CONTEXT"
+          docker push "$IMAGE"
+          echo "FRONTEND_IMAGE=$IMAGE" >> "$GITHUB_ENV"
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+
+      - name: AWS ECR summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Bluegrid AWS ECR Ready"
+            echo "- Region: ${{ vars.AWS_REGION }}"
+            echo "- ECR repository: ${{ vars.ECR_REPOSITORY }}"
+            echo "- Commit SHA: $GITHUB_SHA"
+            echo "- Backend image: ${BACKEND_IMAGE:-NO APLICA / no construida}"
+            echo "- Frontend image: ${FRONTEND_IMAGE:-NO APLICA / no construida}"
+            echo ""
+            echo "Proximo paso: conectar EC2/ECS/App Runner a las imagenes publicadas en ECR."
+          } >> "$GITHUB_STEP_SUMMARY"
