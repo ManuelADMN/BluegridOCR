@@ -32,7 +32,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BackendKPI, DashboardResponse, ReportRecord, User } from '../types';
+import { BackendKPI, DashboardResponse, ReportRecord, User, hasRolePermission } from '../types';
 import { authFetch } from '../services/apiClient';
 import { getApiBaseUrl } from '../services/runtimeConfig';
 import { formatChileDate, formatChileDateTime, monthAgoChileISO, todayChileISO } from '../lib/time';
@@ -262,6 +262,46 @@ export default function Dashboard({
 
   const isAdmin = currentUser?.role === 'admin';
   const canModerate = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
+  // Solo admin/supervisor pueden ver la imagen almacenada del registro.
+  const canViewImages = hasRolePermission(currentUser?.role, 'images:view');
+
+  // Imagen del registro seleccionado (se carga con auth desde la API y se sirve como blob).
+  const [recordImageUrl, setRecordImageUrl] = useState<string | null>(null);
+  const [recordImageState, setRecordImageState] = useState<'idle' | 'loading' | 'ok' | 'none'>('idle');
+
+  useEffect(() => {
+    const id = selectedRecord?.id_registro;
+    if (!id || !canViewImages) {
+      setRecordImageUrl(null);
+      setRecordImageState('idle');
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setRecordImageState('loading');
+    setRecordImageUrl(null);
+    (async () => {
+      try {
+        const baseUrl = (localStorage.getItem('bluegrid_api_url') || getApiBaseUrl()).replace(/\/+$/, '');
+        const resp = await authFetch(`${baseUrl}/api/v1/registros/${id}/imagen?tipo=original`);
+        if (!resp.ok) {
+          if (!cancelled) setRecordImageState('none');
+          return;
+        }
+        const blob = await resp.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (cancelled) { URL.revokeObjectURL(objectUrl); return; }
+        setRecordImageUrl(objectUrl);
+        setRecordImageState('ok');
+      } catch {
+        if (!cancelled) setRecordImageState('none');
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedRecord?.id_registro, canViewImages]);
 
   const fetchDashboardData = async (silent = false) => {
     if (silent) setIsRefreshing(true);
@@ -762,10 +802,14 @@ export default function Dashboard({
               <button onClick={() => setSelectedRecord(null)}><X className="h-5 w-5" /></button>
             </div>
             <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-              <div className="flex min-h-40 items-center justify-center border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400 dark:border-zinc-800">
-                {selectedRecord.url_imagen_original && selectedRecord.url_imagen_original !== 'url_pendiente'
-                  ? 'Imagen asociada disponible para futura integración.'
-                  : 'Imagen no disponible por ahora. Se incorporará Blob Storage más adelante.'}
+              <div className="flex min-h-40 items-center justify-center overflow-hidden border border-dashed border-gray-200 p-2 text-center text-sm text-gray-400 dark:border-zinc-800">
+                {!canViewImages
+                  ? 'No tienes permiso para ver la imagen.'
+                  : recordImageState === 'loading'
+                    ? <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                    : recordImageState === 'ok' && recordImageUrl
+                      ? <img src={recordImageUrl} alt={`Imagen del registro ${selectedRecord.id_registro}`} className="max-h-72 w-full object-contain" />
+                      : 'Imagen no disponible para este registro.'}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

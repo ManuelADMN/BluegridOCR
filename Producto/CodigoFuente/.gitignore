@@ -9,6 +9,10 @@ certs/
 *.key
 *.crt
 
+# Almacenamiento de imágenes en disco (reemplazo de Blob Storage) — nunca subir
+Deploy/backend_api/var/
+data/
+
 # Python
 __pycache__/
 *.py[cod]

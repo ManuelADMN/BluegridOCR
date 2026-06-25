@@ -1,8 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi.responses import FileResponse
 import re
 from services.motor_ia import procesar_registro_ocr
 from services.db import get_connection
 from services.timezone import app_now_naive
+from services import storage
 from dependencies.auth import require_roles
 from core.logger import logger
 
@@ -278,6 +280,25 @@ async def subir_registro(
                 ),
             )
 
+        # Persistir imágenes en disco (reemplazo de Blob Storage). Best-effort: si el
+        # guardado falla, NO se cae el OCR; el registro queda con url_pendiente y la vista
+        # mostrará "no disponible".
+        try:
+            rel_original = storage.guardar_bytes(nuevo_id, "original", contents)
+            rel_warped = storage.guardar_b64(nuevo_id, "warped", resultado_ocr.get("debug", {}).get("warped_b64"))
+            cur.execute(
+                """
+                UPDATE registros_ocr
+                SET url_imagen_original = %s,
+                    url_imagen_procesada = COALESCE(%s, url_imagen_procesada)
+                WHERE id_registro = %s
+                """,
+                (rel_original, rel_warped, nuevo_id),
+            )
+            logger.info("[OPERATIONS] Imagen persistida en disco: %s", rel_original)
+        except Exception:
+            logger.warning("[OPERATIONS] No se pudo persistir la imagen del registro %s", nuevo_id, exc_info=True)
+
         conn.commit()
         cur.close()
         conn.close()
@@ -299,3 +320,23 @@ async def subir_registro(
     except Exception as e:
         logger.exception("[OPERATIONS] Error inesperado en subir_registro")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/registros/{registro_id}/imagen")
+def obtener_imagen_registro(
+    registro_id: int,
+    tipo: str = "original",
+    current_user: dict = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Sirve la imagen almacenada de un registro. SOLO admin y supervisor (el buzo recibe 403).
+    tipo: original | warped | preview.
+    """
+    if tipo not in storage.ALLOWED_TIPOS:
+        raise HTTPException(status_code=400, detail="tipo de imagen no permitido")
+    if not storage.existe(registro_id, tipo):
+        raise HTTPException(status_code=404, detail="Imagen no disponible")
+    ruta = storage.ruta_imagen(registro_id, tipo)
+    logger.info("[OPERATIONS] Imagen servida registro=%s tipo=%s a usuario=%s rol=%s",
+                registro_id, tipo, current_user.get("username"), current_user.get("role"))
+    return FileResponse(str(ruta), media_type=storage.MEDIA_TYPES.get(tipo, "application/octet-stream"))
