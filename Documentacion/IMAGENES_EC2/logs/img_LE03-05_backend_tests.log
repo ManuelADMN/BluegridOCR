@@ -1,0 +1,8 @@
+=== LE-03/04/05 BACKEND Thu Jun 25 12:08:47 PSAST 2026 ===
+--- py_compile ---
+py_compile OK
+--- pytest tests/ (motor + storage + RBAC) ---
+...................                                                      [100%]
+============================== warnings summary ===============================
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+19 passed, 2 warnings in 4.62s

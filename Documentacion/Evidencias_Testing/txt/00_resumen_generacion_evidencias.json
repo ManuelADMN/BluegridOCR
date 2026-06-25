@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-06-25T12:16:21",
+  "test_user": "admin@bluegrid.cl",
+  "auth": {
+    "method": "POST",
+    "url": "http://127.0.0.1:8000/api/v1/auth/login",
+    "status": "SKIPPED",
+    "ok": false,
+    "elapsed_ms": 0,
+    "body_preview": "Definir BLUEGRID_TEST_PASSWORD para ejecutar login autenticado."
+  },
+  "dashboard_auth": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/dashboard/data?fecha_desde=2026-04-14&fecha_hasta=2026-05-14",
+    "status": "SKIPPED",
+    "ok": false,
+    "elapsed_ms": 0,
+    "body_preview": "Sin token valido para probar dashboard autenticado."
+  },
+  "zonas_auth": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/context/zonas",
+    "status": "SKIPPED",
+    "ok": false,
+    "elapsed_ms": 0,
+    "body_preview": "Sin token valido para consultar zonas."
+  },
+  "post_ocr": {
+    "method": "POST",
+    "url": "http://127.0.0.1:8000/api/v1/registros",
+    "status": "SKIPPED",
+    "ok": false,
+    "elapsed_ms": 0,
+    "body_preview": "Sin token valido o imagen de muestra para ejecutar OCR autenticado."
+  },
+  "backend": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/health",
+    "status": "ERROR",
+    "ok": false,
+    "elapsed_ms": 2042.97,
+    "body_preview": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+  },
+  "ready": {
+    "method": "GET",
+    "url": "http://127.0.0.1:8000/api/v1/ready",
+    "status": "ERROR",
+    "ok": false,
+    "elapsed_ms": 2002.75,
+    "body_preview": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+  },
+  "frontend": {
+    "method": "GET",
+    "url": "http://127.0.0.1:5173",
+    "status": "ERROR",
+    "ok": false,
+    "elapsed_ms": 2003.69,
+    "body_preview": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+  },
+  "performance": {
+    "samples_ms": [
+      2001.43,
+      2003.49,
+      2003.31,
+      2005.34,
+      2002.93
+    ],
+    "average_ms": 2003.3,
+    "max_ms": 2005.34,
+    "threshold_ms": 1000,
+    "ok": false
+  },
+  "compatibility": {
+    "python": "Python 3.13.12",
+    "node": "v24.14.0",
+    "npm": "11.2.0",
+    "backend_compile_ok": true
+  }
+}

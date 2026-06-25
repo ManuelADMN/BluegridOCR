@@ -1,0 +1,8 @@
+{
+  "method": "GET",
+  "url": "http://127.0.0.1:8000/api/v1/dashboard/data?fecha_desde=2026-04-14&fecha_hasta=2026-05-14",
+  "status": "ERROR",
+  "ok": false,
+  "elapsed_ms": 2003.55,
+  "body_preview": "<urlopen error [WinError 10061] No connection could be made because the target machine actively refused it>"
+}

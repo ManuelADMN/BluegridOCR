@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:8000/api/v1/registros",
+  "status": "SKIPPED",
+  "ok": false,
+  "elapsed_ms": 0,
+  "body_preview": "Sin token valido o imagen de muestra para ejecutar OCR autenticado."
+}

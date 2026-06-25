@@ -17,6 +17,13 @@ class Settings:
     # y rotado para lectura humana. No cambia el comportamiento por defecto.
     OCR_MODE: str = os.getenv("OCR_MODE", "segmented")
 
+    # Raíz de almacenamiento de imágenes en disco (reemplazo de Blob Storage).
+    # En la EC2 se monta un bind mount: /opt/bluegridocr/data -> /data (env STORAGE_ROOT=/data).
+    # En local, por defecto se usa backend_api/var/images (gitignored).
+    STORAGE_ROOT: str = os.getenv("STORAGE_ROOT") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "var", "images"
+    )
+
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
