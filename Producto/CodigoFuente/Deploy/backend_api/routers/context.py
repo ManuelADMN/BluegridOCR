@@ -14,6 +14,13 @@ class CreateEmbarcacionPayload(BaseModel):
     estado: str = "ACTIVA"
 
 
+class UpdateEmbarcacionPayload(BaseModel):
+    matricula: str | None = Field(None, min_length=2)
+    nombre_nave: str | None = Field(None, min_length=2)
+    capacidad_personas: int | None = Field(None, ge=0)
+    estado: str | None = None
+
+
 class CreateTablillaPayload(BaseModel):
     codigo_tablilla: str = Field(..., min_length=2)
     fk_embarcacion: int | None = None
@@ -195,6 +202,63 @@ def create_embarcacion(
         if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="La matricula ya existe")
         raise HTTPException(status_code=500, detail="Error interno al crear embarcacion")
+    finally:
+        conn.close()
+
+
+@router.patch("/context/embarcaciones/{embarcacion_id}")
+def update_embarcacion(
+    embarcacion_id: int,
+    payload: UpdateEmbarcacionPayload,
+    current_user: dict = Depends(require_roles(["admin"]))
+):
+    conn = get_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT id_embarcacion FROM embarcaciones WHERE id_embarcacion = %s FOR UPDATE", (embarcacion_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Embarcacion no encontrada")
+
+        updates = []
+        params = []
+        if payload.matricula is not None:
+            updates.append("matricula = %s")
+            params.append(payload.matricula.strip().upper())
+        if payload.nombre_nave is not None:
+            updates.append("nombre_nave = %s")
+            params.append(payload.nombre_nave.strip())
+        if payload.capacidad_personas is not None:
+            updates.append("capacidad_personas = %s")
+            params.append(payload.capacidad_personas)
+        if payload.estado is not None:
+            estado = payload.estado.strip().upper()
+            validate_estado_embarcacion(estado)
+            updates.append("estado = %s")
+            params.append(estado)
+
+        if not updates:
+            return {"status": "ok", "updated": False}
+
+        params.append(embarcacion_id)
+        cur.execute(
+            f"""
+            UPDATE embarcaciones SET {', '.join(updates)}
+            WHERE id_embarcacion = %s
+            RETURNING id_embarcacion AS id, nombre_nave AS name, matricula, capacidad_personas, estado
+            """,
+            params,
+        )
+        row = cur.fetchone()
+        conn.commit()
+        return row
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as exc:
+        conn.rollback()
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="La matricula ya existe")
+        raise HTTPException(status_code=500, detail="Error interno al actualizar embarcacion")
     finally:
         conn.close()
 

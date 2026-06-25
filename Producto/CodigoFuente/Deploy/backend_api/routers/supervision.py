@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from services.db import get_connection
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
+
+MAX_MOTIVO_RECHAZO = 200
 from dependencies.auth import require_roles
 from services.timezone import app_now_naive
 from core.logger import logger
@@ -23,7 +25,7 @@ class ValidacionPayload(BaseModel):
     comentarios: Optional[str] = None
 
 class RechazoPayload(BaseModel):
-    motivo: str
+    motivo: str = Field(..., min_length=1, max_length=MAX_MOTIVO_RECHAZO)
 
 
 def set_app_context(cur, current_user: dict):
