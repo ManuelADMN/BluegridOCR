@@ -104,10 +104,14 @@ const emptyForm: FormState = {
 };
 
 const emptyBoatForm = {
+  id_embarcacion: '' as number | '',
   matricula: '',
   nombre_nave: '',
   capacidad_personas: 0,
+  estado: 'ACTIVA',
 };
+
+const BOAT_ESTADOS = ['ACTIVA', 'INACTIVA', 'MANTENCION', 'BAJA'];
 
 const emptyTableForm = {
   id_tablilla: '',
@@ -179,6 +183,7 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
   const [analytics, setAnalytics] = useState<UserAnalytics>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -192,7 +197,7 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
 
   const isEditing = Boolean(form.id_usuario);
 
-  const fetchData = async (silent = false) => {
+  const fetchData = async (silent = false): Promise<boolean> => {
     if (!silent) setIsLoading(true);
     try {
       const [usersResponse, analyticsResponse] = await Promise.all([
@@ -214,11 +219,22 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
       ]);
       if (boatsResponse.ok) setBoats(await boatsResponse.json());
       if (tablesResponse.ok) setTables(await tablesResponse.json());
+      return true;
     } catch (error: any) {
       onNotify(error.message || 'No se pudieron cargar los usuarios', 'error');
+      return false;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Refresco manual con feedback visible (antes era silencioso y parecía que el botón no hacía nada).
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const ok = await fetchData(true);
+    setIsRefreshing(false);
+    if (ok) onNotify('Datos actualizados', 'success');
   };
 
   useEffect(() => {
@@ -342,30 +358,47 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
       return;
     }
     setIsSaving(true);
+    const editing = Boolean(boatForm.id_embarcacion);
     try {
-      const response = await authFetch(`${apiUrl}/api/v1/context/embarcaciones`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          matricula: boatForm.matricula.trim(),
-          nombre_nave: boatForm.nombre_nave.trim(),
-          capacidad_personas: Number(boatForm.capacidad_personas) || 0,
-          estado: 'ACTIVA',
-        }),
-      });
+      const response = await authFetch(
+        editing
+          ? `${apiUrl}/api/v1/context/embarcaciones/${boatForm.id_embarcacion}`
+          : `${apiUrl}/api/v1/context/embarcaciones`,
+        {
+          method: editing ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            matricula: boatForm.matricula.trim(),
+            nombre_nave: boatForm.nombre_nave.trim(),
+            capacidad_personas: Number(boatForm.capacidad_personas) || 0,
+            estado: boatForm.estado || 'ACTIVA',
+          }),
+        },
+      );
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.detail || 'No se pudo crear la embarcación');
+        throw new Error(body?.detail || `No se pudo ${editing ? 'actualizar' : 'crear'} la embarcación`);
       }
-      onNotify('Embarcación creada correctamente', 'success');
+      onNotify(`Embarcación ${editing ? 'actualizada' : 'creada'} correctamente`, 'success');
       setBoatForm(emptyBoatForm);
       setBoatFormOpen(false);
       fetchData(true);
     } catch (error: any) {
-      onNotify(error.message || 'No se pudo crear la embarcación', 'error');
+      onNotify(error.message || 'No se pudo guardar la embarcación', 'error');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const openEditBoat = (boat: Embarcacion) => {
+    setBoatForm({
+      id_embarcacion: boat.id,
+      matricula: boat.matricula || '',
+      nombre_nave: boat.name || '',
+      capacidad_personas: boat.capacidad_personas || 0,
+      estado: boat.estado || 'ACTIVA',
+    });
+    setBoatFormOpen(true);
   };
 
   const saveTable = async () => {
@@ -461,15 +494,15 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => fetchData(true)}>
-              <RefreshCw className="h-4 w-4" />
-              Actualizar
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Actualizando…' : 'Actualizar'}
             </Button>
             {activeSection === 'users' && <Button size="sm" onClick={openCreate}>
               <UserPlus className="h-4 w-4" />
               Crear usuario
             </Button>}
-            {activeSection === 'boats' && <Button size="sm" onClick={() => setBoatFormOpen(true)}>
+            {activeSection === 'boats' && <Button size="sm" onClick={() => { setBoatForm(emptyBoatForm); setBoatFormOpen(true); }}>
               <Ship className="h-4 w-4" />
               Crear embarcación
             </Button>}
@@ -702,6 +735,7 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
                     <th className="px-4 py-3">Capacidad</th>
                     <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3">Tablas asociadas</th>
+                    <th className="px-4 py-3 text-right">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-zinc-900">
@@ -712,10 +746,15 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
                       <td className="px-4 py-3 text-sm text-gray-500">{boat.capacidad_personas || 0}</td>
                       <td className="px-4 py-3"><Badge tone={boat.estado === 'ACTIVA' ? 'success' : 'muted'}>{boat.estado || 'ACTIVA'}</Badge></td>
                       <td className="px-4 py-3 text-sm font-semibold text-gray-600 dark:text-zinc-300">{boat.tablas_asociadas || 0}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openEditBoat(boat)} title="Editar embarcación">
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                   {!boats.length && (
-                    <tr><td colSpan={5} className="py-16 text-center text-sm font-semibold text-gray-400">Sin embarcaciones registradas</td></tr>
+                    <tr><td colSpan={6} className="py-16 text-center text-sm font-semibold text-gray-400">Sin embarcaciones registradas</td></tr>
                   )}
                 </tbody>
               </table>
@@ -884,8 +923,8 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
           <div className="flex h-full w-full max-w-md flex-col border-l border-gray-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-[#0b0b0c]">
             <div className="flex items-start justify-between border-b border-gray-100 p-4 dark:border-zinc-900">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400">Nueva embarcación</p>
-                <h3 className="mt-1 text-xl font-bold text-black dark:text-white">Crear embarcación</h3>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400">{boatForm.id_embarcacion ? 'Editar embarcación' : 'Nueva embarcación'}</p>
+                <h3 className="mt-1 text-xl font-bold text-black dark:text-white">{boatForm.id_embarcacion ? 'Actualizar embarcación' : 'Crear embarcación'}</h3>
               </div>
               <button onClick={() => setBoatFormOpen(false)} className="flex h-9 w-9 items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-black dark:hover:bg-zinc-900 dark:hover:text-white">
                 <X className="h-5 w-5" />
@@ -919,6 +958,14 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
                   value={boatForm.capacidad_personas}
                   onChange={event => setBoatForm({ ...boatForm, capacidad_personas: Number(event.target.value) })}
                   className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-400">Estado</label>
+                <SelectControl
+                  value={boatForm.estado}
+                  onChange={value => setBoatForm({ ...boatForm, estado: value })}
+                  options={BOAT_ESTADOS.map(e => ({ value: e, label: e }))}
                 />
               </div>
               <div className="border border-gray-200 bg-gray-50 p-3 text-sm leading-6 text-gray-500 dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-400">

@@ -134,38 +134,36 @@ BluegridOCR/
 |   |   |-- DiagramPaqueteServicios.png
 |   |   |-- ModeloVista4_1.png
 |   |-- Wireframe/
-|
-|-- Evidencias_Testing/
-|   |-- README.md
-|   |-- README_EVIDENCIAS.md
-|   |-- Pruebas_Funcionales/
-|   |   |-- Prueba_Login.png
-|   |   |-- Prueba_SubidaDocumento.png
-|   |   |-- Prueba_ExtraccionDatos.png
-|   |-- Pruebas_API/
-|   |   |-- POST_Auth.png
-|   |   |-- GET_Documentos.png
-|   |   |-- POST_OCR.png
-|   |-- Pruebas_Integracion/
-|   |   |-- Flujo_Completo.png
-|   |   |-- Integracion_Front_Back.png
-|   |   |-- Integracion_Back_DB.png
-|   |-- Pruebas_No_Funcionales/
-|   |   |-- Rendimiento.png
-|   |   |-- Seguridad.png
-|   |   |-- Compatibilidad.png
-|   |-- imagenes/
-|   |   |-- 01_muestra_ocr_original.jpg
-|   |   |-- 02_muestra_ocr_warped.png
-|   |   |-- 03_muestra_ocr_grid_preview.png
-|   |   |-- 04_muestra_ocr_contact_sheet_count.png
-|   |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
-|   |   |-- Estructura_Evidencias_Testing.png
-|   |-- scripts/
-|   |   |-- generar_evidencias_testing.py
-|   |   |-- rotar_tablilla.py
-|   |-- txt/
-|       |-- resultados .txt/.json de respaldo tecnico
+|   |-- Evidencias_Testing/
+|       |-- README.md
+|       |-- Pruebas_Funcionales/
+|       |   |-- Prueba_Login.png
+|       |   |-- Prueba_SubidaDocumento.png
+|       |   |-- Prueba_ExtraccionDatos.png
+|       |-- Pruebas_API/
+|       |   |-- POST_Auth.png
+|       |   |-- GET_Documentos.png
+|       |   |-- POST_OCR.png
+|       |-- Pruebas_Integracion/
+|       |   |-- Flujo_Completo.png
+|       |   |-- Integracion_Front_Back.png
+|       |   |-- Integracion_Back_DB.png
+|       |-- Pruebas_No_Funcionales/
+|       |   |-- Rendimiento.png
+|       |   |-- Seguridad.png
+|       |   |-- Compatibilidad.png
+|       |-- imagenes/
+|       |   |-- 01_muestra_ocr_original.jpg
+|       |   |-- 02_muestra_ocr_warped.png
+|       |   |-- 03_muestra_ocr_grid_preview.png
+|       |   |-- 04_muestra_ocr_contact_sheet_count.png
+|       |   |-- 05_muestra_ocr_original_rotada_90_clockwise.jpg
+|       |   |-- Estructura_Evidencias_Testing.png
+|       |-- scripts/
+|       |   |-- generar_evidencias_testing.py
+|       |   |-- rotar_tablilla.py
+|       |-- txt/
+|           |-- resultados .txt/.json de respaldo tecnico
 |
 |-- Gestion/
 |   |-- Integrantes.txt
@@ -183,7 +181,6 @@ BluegridOCR/
 |       |-- .gitignore
 |       |-- README.md
 |       |-- run.py
-|       |-- HTTPS.md
 |       |-- docker-compose.prod.yml
 |       |-- docker-compose.azure.yml
 |       |-- docker-compose.https.yml
@@ -592,7 +589,7 @@ Checks funcionales minimos:
 La carpeta de evidencias tecnicas del proyecto se encuentra en:
 
 ```txt
-Evidencias_Testing/
+Documentacion/Evidencias_Testing/
 ```
 
 Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la entrega. Su objetivo es dejar respaldo verificable de que el sistema levanta, responde, valida configuracion critica, compila, construye el frontend y protege rutas privadas.
@@ -600,9 +597,8 @@ Esta carpeta corresponde al bloque de `Evidencias_Testing` solicitado para la en
 ### Estructura de Evidencias_Testing
 
 ```txt
-Evidencias_Testing/
+Documentacion/Evidencias_Testing/
 |-- README.md
-|-- README_EVIDENCIAS.md
 |
 |-- Pruebas_Funcionales/
 |   |-- Prueba_Login.png
@@ -657,7 +653,7 @@ Evidencias_Testing/
 | `Pruebas_No_Funcionales/Seguridad.png` | Ruta protegida sin token. | `401 Unauthorized`. |
 | `Pruebas_No_Funcionales/Compatibilidad.png` | Versiones y compilacion backend. | Compatibilidad OK. |
 
-Los resultados crudos quedan en `Evidencias_Testing/txt/` como respaldo `.txt` y `.json`.
+Los resultados crudos quedan en `Documentacion/Evidencias_Testing/txt/` como respaldo `.txt` y `.json`.
 
 Archivo adicional relevante: `txt/12_admin_access_users_response.txt` confirma login admin y acceso HTTP 200 a `/api/v1/users`.
 
@@ -677,25 +673,25 @@ Archivo adicional relevante: `txt/12_admin_access_users_response.txt` confirma l
 El script:
 
 ```txt
-Evidencias_Testing/scripts/rotar_tablilla.py
+Documentacion/Evidencias_Testing/scripts/rotar_tablilla.py
 ```
 
 permite rotar una imagen de tablilla y generar una version corregida para adjuntarla como evidencia visual:
 
 ```powershell
-python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
+python Documentacion/Evidencias_Testing/scripts/rotar_tablilla.py Documentacion/Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Documentacion/Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
 ```
 
 Si la orientacion correcta queda hacia el otro lado:
 
 ```powershell
-python Evidencias_Testing/scripts/rotar_tablilla.py Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
+python Documentacion/Evidencias_Testing/scripts/rotar_tablilla.py Documentacion/Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Documentacion/Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_counterclockwise.jpg counterclockwise
 ```
 
 Para regenerar toda la bateria de evidencias:
 
 ```powershell
-python Evidencias_Testing/scripts/generar_evidencias_testing.py
+python Documentacion/Evidencias_Testing/scripts/generar_evidencias_testing.py
 ```
 
 ### Estado de cierre de evidencias

@@ -1,9 +1,0 @@
-=== LE-07 COMPOSE CONFIG Thu Jun 25 12:09:21 PSAST 2026 ===
-    container_name: bluegridocr_backend_prod
-      STORAGE_ROOT: /data
-        target: 8000
-    volumes:
-        source: /opt/bluegridocr/data
-        target: /data
-        target: 80
-EXIT=0

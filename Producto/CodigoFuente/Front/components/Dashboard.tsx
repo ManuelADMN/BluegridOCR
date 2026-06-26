@@ -917,11 +917,15 @@ export default function Dashboard({
                   </p>
                   <textarea
                     value={rejectReason}
-                    onChange={event => setRejectReason(event.target.value)}
+                    onChange={event => setRejectReason(event.target.value.slice(0, 200))}
                     rows={4}
+                    maxLength={200}
                     className="w-full resize-none border border-gray-200 bg-white p-3 text-sm font-medium text-black outline-none transition-colors placeholder:text-gray-400 focus:border-blue-500 dark:border-zinc-800 dark:bg-[#050505] dark:text-white dark:focus:border-blue-400"
                     placeholder="Ej: imagen borrosa, tabla incompleta o conteo inconsistente."
                   />
+                  <p className={`text-right text-xs font-medium ${rejectReason.length >= 200 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {rejectReason.length}/200
+                  </p>
                 </>
               ) : (
                 <div className="border border-gray-200 bg-gray-50 p-3 text-sm leading-6 text-gray-600 dark:border-zinc-800 dark:bg-zinc-950/60 dark:text-zinc-300">
