@@ -1,11 +1,29 @@
-# Evidencias Testing - BluegridOCR
+# Evidencias de Prueba - BluegridOCR
 
-Directorio de respaldo tecnico para pruebas del sistema. La estructura sigue el patron solicitado para la entrega y agrupa evidencias por tipo de prueba.
+Fecha de generacion: 2026-05-14  
+Proyecto: BluegridOCR  
+Carpeta: `Documentacion/Evidencias_Testing/`
+
+Este documento resume las evidencias tecnicas generadas para demostrar que el sistema levanta correctamente, expone sus servicios, valida configuracion critica, compila, protege rutas privadas y cuenta con pruebas organizadas por categoria.
+
+## Resultado General
+
+```txt
+Backend: OK
+Frontend: OK
+Base de datos: OK
+Clave Anthropic configurada: OK
+JWT configurado: OK
+Build frontend: OK
+Compilacion backend: OK
+Rutas protegidas: OK
+Evidencias PNG por categoria: OK
+```
 
 ## Estructura
 
 ```txt
-Evidencias_Testing/
+Documentacion/Evidencias_Testing/
 |-- Pruebas_Funcionales/
 |   |-- Prueba_Login.png
 |   |-- Prueba_SubidaDocumento.png
@@ -31,57 +49,79 @@ Evidencias_Testing/
 |-- scripts/
 |-- txt/
 |-- README.md
-|-- README_EVIDENCIAS.md
 ```
 
-## Pruebas Funcionales
+## Detalle de Pruebas
 
-| Evidencia | Que prueba | Resultado |
+| Categoria | Archivo | Validacion |
 | --- | --- | --- |
-| `Pruebas_Funcionales/Prueba_Login.png` | Envia credenciales vigentes al endpoint de login y verifica autenticacion. | OK: HTTP 200, rol admin, token omitido. |
-| `Pruebas_Funcionales/Prueba_SubidaDocumento.png` | Ejecuta solicitud autenticada al endpoint de registros/OCR con imagen de muestra. | OK: HTTP 200, registro generado. |
-| `Pruebas_Funcionales/Prueba_ExtraccionDatos.png` | Verifica artefactos visuales del pipeline OCR/debug: original, rectificacion y grilla. | OK. |
+| Funcional | `Pruebas_Funcionales/Prueba_Login.png` | Login contra `/api/v1/auth/login`. |
+| Funcional | `Pruebas_Funcionales/Prueba_SubidaDocumento.png` | Solicitud al endpoint de carga OCR. |
+| Funcional | `Pruebas_Funcionales/Prueba_ExtraccionDatos.png` | Existencia de artefactos OCR/debug. |
+| API | `Pruebas_API/POST_Auth.png` | Prueba POST de autenticacion. |
+| API | `Pruebas_API/GET_Documentos.png` | Disponibilidad de Swagger en `/docs`. |
+| API | `Pruebas_API/POST_OCR.png` | Prueba POST del endpoint OCR. |
+| Integracion | `Pruebas_Integracion/Flujo_Completo.png` | Frontend, backend, ready y OpenAPI disponibles. |
+| Integracion | `Pruebas_Integracion/Integracion_Front_Back.png` | Conexion entre frontend y backend. |
+| Integracion | `Pruebas_Integracion/Integracion_Back_DB.png` | Backend conectado a base de datos. |
+| No funcional | `Pruebas_No_Funcionales/Rendimiento.png` | Latencia de `/api/v1/health`. |
+| No funcional | `Pruebas_No_Funcionales/Seguridad.png` | Ruta protegida rechaza acceso sin token. |
+| No funcional | `Pruebas_No_Funcionales/Compatibilidad.png` | Versiones y compilacion backend. |
 
-## Pruebas API
+## Resultados en Texto
 
-| Evidencia | Que prueba | Resultado |
-| --- | --- | --- |
-| `Pruebas_API/POST_Auth.png` | `POST /api/v1/auth/login`. | Backend autentica correctamente. |
-| `Pruebas_API/GET_Documentos.png` | `GET /docs`. | Swagger disponible con HTTP 200. |
-| `Pruebas_API/POST_OCR.png` | `POST /api/v1/registros`. | Endpoint OCR responde HTTP 200 con token valido. |
+La carpeta `txt/` conserva los resultados crudos en `.txt` y `.json`, utiles para auditoria tecnica y trazabilidad.
 
-## Pruebas de Integracion
+Archivos destacados:
 
-| Evidencia | Que prueba | Resultado |
-| --- | --- | --- |
-| `Pruebas_Integracion/Flujo_Completo.png` | Frontend, backend, readiness y OpenAPI disponibles. | OK. |
-| `Pruebas_Integracion/Integracion_Front_Back.png` | Disponibilidad del frontend, backend y respuesta OPTIONS/CORS. | OK. |
-| `Pruebas_Integracion/Integracion_Back_DB.png` | `GET /api/v1/ready` confirma conexion a base de datos. | OK: `database=true`. |
+```txt
+txt/01_backend_health.txt
+txt/02_backend_ready_db_ia_jwt.txt
+txt/08_frontend_build.txt
+txt/11_dashboard_data_response.txt
+txt/12_admin_access_users_response.txt
+txt/00_resumen_generacion_evidencias.json
+```
 
-## Pruebas No Funcionales
-
-| Evidencia | Que prueba | Resultado |
-| --- | --- | --- |
-| `Pruebas_No_Funcionales/Rendimiento.png` | Tiempos de respuesta de `/api/v1/health` en varias muestras. | OK bajo umbral definido. |
-| `Pruebas_No_Funcionales/Seguridad.png` | Acceso a ruta protegida sin token. | OK: `401 Unauthorized`. |
-| `Pruebas_No_Funcionales/Compatibilidad.png` | Versiones de Python, Node, npm y compilacion backend. | OK. |
-
-Adicionalmente, `txt/12_admin_access_users_response.txt` documenta que el usuario admin validado puede consultar `/api/v1/users` con HTTP 200.
-
-## Archivos complementarios
-
-La carpeta `txt/` contiene los resultados en texto/JSON de las pruebas ejecutadas. La carpeta `imagenes/` contiene artefactos visuales OCR/debug, muestras rotadas y la imagen `Estructura_Evidencias_Testing.png` para anexar al informe. La carpeta `scripts/` contiene utilidades para generar evidencias y rotar imagenes.
-
-## Acceso de evaluacion
+## Acceso de Evaluacion
 
 | Usuario | Contrasena | Rol |
 | --- | --- | --- |
 | `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
 
-Este acceso fue validado contra `/api/v1/auth/login` y permite revisar los modulos administrativos. Se recomienda rotarlo despues de la evaluacion.
+El usuario fue actualizado en la base de datos y validado con login HTTP 200. Por seguridad, los tokens JWT no se guardan en los archivos de evidencia.
 
-Para regenerar la bateria de evidencias:
+## Regeneracion
+
+Para regenerar las pruebas:
 
 ```powershell
-python Evidencias_Testing/scripts/generar_evidencias_testing.py
+python Documentacion/Evidencias_Testing/scripts/generar_evidencias_testing.py
 ```
+
+Para rotar una tablilla guardada localmente:
+
+```powershell
+python Documentacion/Evidencias_Testing/scripts/rotar_tablilla.py Documentacion/Evidencias_Testing/imagenes/tablilla_original_usuario.jpg Documentacion/Evidencias_Testing/imagenes/tablilla_usuario_rotada_90_clockwise.jpg clockwise
+```
+
+## Evidencia OCR Real
+
+La evidencia OCR completa con escritura en base de datos fue ejecutada con usuario valido y token vigente:
+
+```txt
+POST /api/v1/registros
+Authorization: Bearer <token_valido>
+file=<imagen_tablilla>
+zona_id=<id_sector>
+```
+
+El resultado quedo documentado en:
+
+```txt
+Pruebas_API/POST_OCR.png
+Pruebas_Funcionales/Prueba_SubidaDocumento.png
+txt/POST_OCR.json
+```
+
+Por seguridad, el token JWT, la contrasena y los recortes base64 fueron omitidos de los archivos de evidencia.
