@@ -6,6 +6,7 @@ from typing import List, Optional
 MAX_MOTIVO_RECHAZO = 200
 from dependencies.auth import require_roles
 from services.timezone import app_now_naive
+from services import storage
 from core.logger import logger
 
 router = APIRouter(tags=["Supervision"])
@@ -354,6 +355,85 @@ def eliminar_registro(
         conn.commit()
         return {"status": "ok", "id_registro": registro_id, "estado": "ELIMINADO"}
     except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@router.delete("/registros/{registro_id}/purga")
+def purgar_registro(
+    registro_id: int,
+    current_user: dict = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Supresión real de los datos personales de un registro (Ley 21.719, arts. 4 y 7).
+
+    A diferencia de DELETE /registros/{id} (que sólo marca ELIMINADO y conserva todo), esta
+    operación elimina de forma irreversible los artefactos personales/biométricos:
+      - los archivos de imagen en disco (original, rectificada, previews);
+      - los recortes de escritura (recorte_base64) en feedback_ia asociados al registro;
+      - las URLs de imagen en registros_ocr.
+
+    Se conserva una fila-lápida en estado ELIMINADO para no romper integridad referencial ni
+    la trazabilidad de auditoría (art. 3 e, principio de responsabilidad). La operación es
+    idempotente: repetirla no falla.
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        set_app_context(cur, current_user)
+        timestamp = app_now_naive()
+
+        cur.execute(
+            "SELECT 1 FROM registros_ocr WHERE id_registro=%s",
+            (registro_id,),
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(status_code=404, detail=f"Registro {registro_id} no encontrado")
+
+        # 1) Recortes de escritura (dato más sensible) → se anulan en la BD.
+        cur.execute(
+            "UPDATE feedback_ia SET recorte_base64=NULL WHERE fk_registro=%s AND recorte_base64 IS NOT NULL",
+            (registro_id,),
+        )
+        recortes_purgados = cur.rowcount
+
+        # 2) URLs de imagen + estado en registros_ocr.
+        cur.execute(
+            """
+            UPDATE registros_ocr
+            SET estado_validacion='ELIMINADO',
+                url_imagen_original=NULL,
+                url_imagen_procesada=NULL,
+                rechazo_motivo=COALESCE(rechazo_motivo, 'Datos suprimidos (derecho de supresión)'),
+                validated_at=%s,
+                validated_by=%s,
+                updated_at=%s
+            WHERE id_registro=%s
+            """,
+            (timestamp, int(current_user["id"]), timestamp, registro_id),
+        )
+
+        # 3) Archivos en disco → se borran de forma irreversible. Si falla, revertimos la BD.
+        archivos_eliminados = storage.eliminar_directorio(registro_id)
+
+        conn.commit()
+        logger.info(
+            "[SUPERVISION] purga registro=%s por usuario=%s recortes=%d archivos=%d",
+            registro_id, current_user["id"], recortes_purgados, archivos_eliminados,
+        )
+        return {
+            "status": "ok",
+            "id_registro": registro_id,
+            "estado": "ELIMINADO",
+            "recortes_purgados": recortes_purgados,
+            "archivos_eliminados": archivos_eliminados,
+        }
+    except HTTPException:
+        conn.rollback()
         raise
     except Exception as e:
         conn.rollback()

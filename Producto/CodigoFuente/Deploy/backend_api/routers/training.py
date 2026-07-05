@@ -89,7 +89,23 @@ def obtener_excepciones(
     usuario_id: int,
     current_user: dict = Depends(require_roles(["admin", "supervisor", "buzo"]))
 ):
-    """Devuelve las últimas correcciones de un buzo para usarlas como contexto OCR."""
+    """Devuelve las últimas correcciones de un buzo para usarlas como contexto OCR.
+
+    Control de acceso: un buzo sólo puede consultar sus propias correcciones. Admin y
+    supervisor pueden consultar las de cualquier usuario. Sin esta comprobación, cualquier
+    buzo autenticado podría leer los recortes de escritura (recorte_base64) de otro titular,
+    vulnerando el deber de confidencialidad y seguridad de la Ley 21.719 (arts. 14 bis y 14 quinquies).
+    """
+    if current_user["role"] == "buzo" and int(current_user["id"]) != usuario_id:
+        logger.warning(
+            "[TRAINING] Acceso horizontal denegado: buzo id=%s intentó leer excepciones de usuario_id=%s",
+            current_user["id"], usuario_id,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="No puedes acceder a las correcciones de otro usuario",
+        )
+
     conn = get_connection()
     try:
         cur = conn.cursor()

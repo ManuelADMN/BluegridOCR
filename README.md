@@ -1,4 +1,23 @@
-# BluegridOCR
+<p align="center">
+  <img src="Documentacion/assets/readme/bluegridocr-banner.png" alt="BluegridOCR banner" width="100%">
+</p>
+
+<h1 align="center">BluegridOCR</h1>
+
+<p align="center">
+  Digitalizacion OCR de planillas acuicolas con vision artificial, FastAPI, React, Supabase y Claude Vision.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=111827" alt="Frontend React Vite">
+  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend FastAPI">
+  <img src="https://img.shields.io/badge/DB-Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=111827" alt="Supabase">
+  <img src="https://img.shields.io/badge/OCR-Claude%20Vision-191919?style=for-the-badge" alt="Claude Vision">
+</p>
+
+<p align="center">
+  <img src="Documentacion/assets/readme/bluegridocr-profile.png" alt="BluegridOCR profile icon" width="148">
+</p>
 
 ## Aviso critico antes de levantar el sistema
 
@@ -21,6 +40,8 @@ BluegridOCR es un sistema web para digitalizar planillas acuicolas mediante visi
 ## Tabla de contenidos
 
 * [Aviso critico antes de levantar el sistema](#aviso-critico-antes-de-levantar-el-sistema)
+* [Vista rapida](#vista-rapida)
+* [Identidad visual](#identidad-visual)
 * [Descripcion general](#descripcion-general)
 * [Estructura actualizada del proyecto](#estructura-actualizada-del-proyecto)
 * [Stack tecnologico](#stack-tecnologico)
@@ -33,6 +54,46 @@ BluegridOCR es un sistema web para digitalizar planillas acuicolas mediante visi
 * [Pruebas recomendadas](#pruebas-recomendadas)
 * [Evidencias Testing](#evidencias-testing)
 * [Recordatorio final sobre el .env](#recordatorio-final-sobre-el-env)
+
+---
+
+## Vista rapida
+
+| Area | Detalle |
+| --- | --- |
+| Proposito | Digitalizar tablillas acuicolas y convertirlas en registros estructurados. |
+| Entrada principal | Imagen de tablilla o plantilla de campo. |
+| Salida principal | Matriz OCR revisable, registro persistido y datos disponibles para dashboard. |
+| Usuarios | `admin`, `supervisor`, `buzo`. |
+| Frontend local | `http://localhost:5173` |
+| Backend local | `http://127.0.0.1:8000` |
+| Docker frontend | `http://localhost:3000` |
+| Documentacion API | `http://127.0.0.1:8000/docs` |
+
+Comandos principales:
+
+```powershell
+cd Producto/CodigoFuente
+python run.py
+```
+
+```powershell
+docker compose -f docker-compose.prod.yml up --build
+```
+
+---
+
+## Identidad visual
+
+Los assets visuales del README se encuentran en:
+
+```txt
+Documentacion/assets/readme/
+|-- bluegridocr-banner.png
+|-- bluegridocr-profile.png
+```
+
+El banner representa el flujo operativo de BluegridOCR: captura de imagen, lectura OCR, matriz digitalizada, backend/API, base de datos y analisis de resultados. La imagen de perfil se dejo como icono cuadrado para uso en documentacion, entregas o presentaciones.
 
 ---
 
@@ -58,6 +119,10 @@ BluegridOCR/
 |-- .gitignore
 |
 |-- Documentacion/
+|   |-- assets/
+|   |   |-- readme/
+|   |       |-- bluegridocr-banner.png
+|   |       |-- bluegridocr-profile.png
 |   |-- Informe/
 |   |-- Gantt/
 |   |   |-- CartaGantt.png

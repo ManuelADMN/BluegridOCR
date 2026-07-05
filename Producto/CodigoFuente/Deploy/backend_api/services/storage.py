@@ -13,6 +13,7 @@ protegida GET /api/v1/registros/{id}/imagen (solo admin/supervisor).
 Sin dependencias de red ni de base de datos: es puramente filesystem, testeable offline.
 """
 import base64
+import shutil
 from pathlib import Path
 
 from core.config import settings
@@ -86,3 +87,29 @@ def existe(id_registro, tipo: str = "original") -> bool:
         return ruta_imagen(id_registro, tipo).is_file()
     except Exception:
         return False
+
+
+def eliminar_directorio(id_registro) -> int:
+    """Elimina de forma irreversible todos los archivos de un registro (imágenes original,
+    rectificada y previews) borrando su carpeta `registros/{id}/`.
+
+    Devuelve la cantidad de archivos eliminados. Es idempotente: si la carpeta no existe,
+    devuelve 0. Soporta el derecho de supresión de la Ley 21.719 (arts. 4 y 7).
+
+    El id se valida como entero positivo (nunca texto), por lo que no es posible construir
+    una ruta fuera de STORAGE_ROOT (defensa contra path traversal).
+    """
+    destino = registro_dir(id_registro)  # valida el id
+    root = _root().resolve()
+    resuelto = destino.resolve()
+    # Salvaguarda extra: nunca borrar fuera de la raíz de almacenamiento.
+    if root not in resuelto.parents:
+        raise ValueError(f"ruta fuera de STORAGE_ROOT: {resuelto}")
+
+    if not destino.is_dir():
+        return 0
+
+    archivos = sum(1 for p in destino.rglob("*") if p.is_file())
+    shutil.rmtree(destino)
+    logger.info("[STORAGE] purga registro=%s archivos_eliminados=%d", id_registro, archivos)
+    return archivos
