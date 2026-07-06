@@ -45,6 +45,118 @@ def _normalize_detalles(detalles: List[DetalleRow]) -> list[DetalleRow]:
         normalized[detalle.fila_index] = detalle
     return [normalized[key] for key in sorted(normalized)]
 
+
+def _save_detalles(cur, registro_id: int, detalles: list[DetalleRow], user_id: int, timestamp) -> None:
+    for detalle in detalles:
+        cur.execute(
+            """
+            UPDATE detalles_captura
+            SET n_nidos = %s,
+                n_cuevas_cubiertas = %s,
+                captura_hembras_tipo = %s,
+                total_pulpos = %s,
+                updated_at = %s,
+                editado_por = %s
+            WHERE fk_registro = %s AND fila_index = %s
+            """,
+            (
+                detalle.n_nidos, detalle.n_cuevas, detalle.hembra, detalle.pulpos,
+                timestamp, user_id, registro_id, detalle.fila_index,
+            ),
+        )
+        if cur.rowcount == 0:
+            cur.execute(
+                """
+                INSERT INTO detalles_captura
+                    (fk_registro, fila_index, n_nidos, n_cuevas_cubiertas,
+                     captura_hembras_tipo, total_pulpos, updated_at, editado_por)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    registro_id, detalle.fila_index, detalle.n_nidos, detalle.n_cuevas,
+                    detalle.hembra, detalle.pulpos, timestamp, user_id,
+                ),
+            )
+
+
+@router.put("/registros/{registro_id}/confirmacion")
+def confirmar_registro_buzo(
+    registro_id: int,
+    payload: ValidacionPayload,
+    current_user: dict = Depends(require_roles(["buzo"])),
+):
+    """Guarda la revisión del buzo sin otorgarle validación administrativa."""
+    conn = get_connection()
+    cur = None
+    try:
+        cur = conn.cursor()
+        set_app_context(cur, current_user)
+        detalles = _normalize_detalles(payload.detalles)
+        if not detalles:
+            raise HTTPException(status_code=422, detail="No hay detalles para confirmar")
+
+        cur.execute(
+            """
+            SELECT fk_usuario_creador, estado_validacion
+            FROM registros_ocr
+            WHERE id_registro = %s
+            FOR UPDATE
+            """,
+            (registro_id,),
+        )
+        registro = cur.fetchone()
+        if not registro:
+            raise HTTPException(status_code=404, detail=f"Registro {registro_id} no encontrado")
+        if int(registro[0]) != int(current_user["id"]):
+            raise HTTPException(status_code=403, detail="Solo puedes confirmar tus propias digitalizaciones")
+
+        estado = str(registro[1] or "").upper()
+        if estado in {"VALIDADO", "APROBADO", "ELIMINADO"}:
+            raise HTTPException(status_code=409, detail=f"El registro no puede confirmarse en estado {estado}")
+
+        timestamp = app_now_naive()
+        _save_detalles(cur, registro_id, detalles, int(current_user["id"]), timestamp)
+        cur.execute(
+            """
+            UPDATE registros_ocr
+            SET estado_validacion = 'PENDIENTE_VALIDACION',
+                rechazo_motivo = NULL,
+                updated_at = %s
+            WHERE id_registro = %s
+            """,
+            (timestamp, registro_id),
+        )
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_submitted_by_diver",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={"detail_rows": len(detalles)},
+        )
+        conn.commit()
+        logger.info(
+            "[SUPERVISION] Buzo %s confirmó registro=%d con %d filas; queda pendiente",
+            current_user["username"], registro_id, len(detalles),
+        )
+        return {
+            "status": "ok",
+            "id_registro": registro_id,
+            "estado": "PENDIENTE_VALIDACION",
+            "detalles": len(detalles),
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as exc:
+        conn.rollback()
+        logger.exception("[SUPERVISION] Error al confirmar registro de buzo id=%d", registro_id)
+        raise HTTPException(status_code=500, detail="No se pudo confirmar la digitalización") from exc
+    finally:
+        if cur:
+            cur.close()
+        conn.close()
+
 @router.put("/registros/{registro_id}/validacion")
 def validar_registro(
     registro_id: int,
@@ -93,51 +205,7 @@ def validar_registro(
         logger.info("[SUPERVISION] registros_ocr actualizado a VALIDADO")
 
         # 2. Actualizar detalles previos sin borrado fisico: la BDD protege la trazabilidad.
-        for d in detalles:
-            logger.debug("[SUPERVISION]   fila=%d  nidos=%d  cuevas=%d  hembra=%d  pulpos=%d",
-                         d.fila_index, d.n_nidos, d.n_cuevas, d.hembra, d.pulpos)
-            cur.execute(
-                """
-                UPDATE detalles_captura
-                SET n_nidos = %s,
-                    n_cuevas_cubiertas = %s,
-                    captura_hembras_tipo = %s,
-                    total_pulpos = %s,
-                    updated_at = %s,
-                    editado_por = %s
-                WHERE fk_registro = %s
-                  AND fila_index = %s
-                """,
-                (
-                    d.n_nidos,
-                    d.n_cuevas,
-                    d.hembra,
-                    d.pulpos,
-                    timestamp,
-                    int(current_user["id"]),
-                    registro_id,
-                    d.fila_index,
-                )
-            )
-            if cur.rowcount == 0:
-                cur.execute(
-                    """
-                    INSERT INTO detalles_captura
-                        (fk_registro, fila_index, n_nidos, n_cuevas_cubiertas,
-                         captura_hembras_tipo, total_pulpos, updated_at, editado_por)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        registro_id,
-                        d.fila_index,
-                        d.n_nidos,
-                        d.n_cuevas,
-                        d.hembra,
-                        d.pulpos,
-                        timestamp,
-                        int(current_user["id"]),
-                    )
-                )
+        _save_detalles(cur, registro_id, detalles, int(current_user["id"]), timestamp)
 
         insert_audit_event(
             cur,

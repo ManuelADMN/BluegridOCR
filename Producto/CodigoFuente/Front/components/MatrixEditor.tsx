@@ -229,6 +229,10 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
       }
 
       await onSave(cells);
+    } catch (error: any) {
+      const message = error?.message || 'No se pudo confirmar la digitalización';
+      bgoLog.error('EDITOR', `Confirmación fallida: ${message}`);
+      onNotify(message, 'error');
     } finally {
       setIsSaving(false);
     }

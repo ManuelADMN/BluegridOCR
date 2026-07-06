@@ -69,6 +69,7 @@ ADMIN_ONLY = [
 BUZO_ALLOWED = [
     ("GET", "/api/v1/context/zonas"),
     ("POST", "/api/v1/registros"),
+    ("PUT", "/api/v1/registros/1/confirmacion"),
 ]
 
 

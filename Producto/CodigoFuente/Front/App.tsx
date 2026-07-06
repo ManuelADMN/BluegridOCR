@@ -453,15 +453,17 @@ export default function App() {
 
     const detalles = Array.from(rowMap.values());
 
+    const isDiverConfirmation = user?.role === 'buzo';
     const payload = {
       usuario_id:  user?.id || 1,
       zona_id:     ocrData.zona_id || 1,
       tablilla_id: null,
       detalles,
-      comentarios: `Validado por ${user?.username || 'WebClient'}`,
+      comentarios: `${isDiverConfirmation ? 'Confirmado' : 'Validado'} por ${user?.username || 'WebClient'}`,
     };
 
-    const response = await authFetch(`${apiUrl}/api/v1/registros/${id}/validacion`, {
+    const actionPath = isDiverConfirmation ? 'confirmacion' : 'validacion';
+    const response = await authFetch(`${apiUrl}/api/v1/registros/${id}/${actionPath}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -470,13 +472,20 @@ export default function App() {
     if (!response.ok) {
       const txt = await response.text();
       bgoLog.error('VALIDATION', `Falló: ${response.status} → ${txt}`);
-      throw new Error(`Validación fallida (${response.status}): ${txt}`);
+      let detail = txt;
+      try { detail = JSON.parse(txt)?.detail || txt; } catch { /* respuesta no JSON */ }
+      throw new Error(detail || `No se pudo confirmar la matriz (${response.status})`);
     }
 
-    bgoLog.info('VALIDATION', `Registro ${id} guardado como VALIDADO con ${detalles.length} filas de detalle`);
-    showNotification('Matriz validada y guardada correctamente', 'success');
+    bgoLog.info('VALIDATION', `Registro ${id} guardado mediante ${actionPath} con ${detalles.length} filas de detalle`);
+    showNotification(
+      isDiverConfirmation ? 'Matriz guardada y enviada a supervisión' : 'Matriz validada y guardada correctamente',
+      'success',
+    );
     setView('success');
-    setSuccessMsg('¡Registro guardado correctamente!');
+    setSuccessMsg(
+      isDiverConfirmation ? 'Tu digitalización quedó pendiente de validación.' : '¡Registro guardado correctamente!',
+    );
   };
 
   const resetFlow = () => {
@@ -1199,7 +1208,7 @@ export default function App() {
                     </div>
                     <h2 className="text-4xl font-semibold tracking-tighter text-black dark:text-white mb-4">Completado</h2>
                     <p className="text-gray-500 dark:text-zinc-400 text-base font-medium mb-10 leading-relaxed">
-                      La matriz ha sido validada y sincronizada con el sistema central.
+                      {successMsg || 'La matriz ha sido guardada y sincronizada con el sistema central.'}
                     </p>
                     <button
                       onClick={resetFlow}
