@@ -49,6 +49,13 @@ ROLE_BY_ID = {
 }
 
 
+def set_app_context(cur, current_user: dict) -> None:
+    """Expose the authenticated identity to PostgreSQL security triggers/RLS."""
+    cur.execute("SELECT set_config('app.user_id', %s, true)", (str(current_user.get("id") or ""),))
+    cur.execute("SELECT set_config('app.username', %s, true)", (str(current_user.get("username") or ""),))
+    cur.execute("SELECT set_config('app.role', %s, true)", (str(current_user.get("role") or ""),))
+
+
 def payload_email(payload) -> str:
     email = (getattr(payload, "correo", None) or getattr(payload, "username", None) or "").strip()
     if not email:
@@ -132,6 +139,7 @@ def create_user(
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        set_app_context(cur, current_user)
         email = payload_email(payload)
         role_name = payload_role(payload)
         rut = (payload.rut or rut_for_email(email)).strip()
@@ -356,6 +364,7 @@ def update_user(
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        set_app_context(cur, current_user)
         cur.execute("SELECT id_usuario FROM usuarios WHERE id_usuario = %s", (user_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -442,40 +451,29 @@ def delete_user(
 ):
     if int(current_user["id"]) == user_id:
         raise HTTPException(status_code=400, detail="No puedes eliminar tu propio usuario")
+    if hard:
+        raise HTTPException(
+            status_code=409,
+            detail="El borrado físico está deshabilitado para conservar la auditoría. Desactiva el usuario mediante baja lógica.",
+        )
 
     conn = get_connection()
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        set_app_context(cur, current_user)
         timestamp = app_now_naive()
 
-        if hard:
-            cur.execute(
-                """
-                SELECT COUNT(*) AS total
-                FROM registros_ocr
-                WHERE fk_usuario_creador = %s
-                """,
-                (user_id,)
-            )
-            if int((cur.fetchone() or {}).get("total") or 0) > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail="El usuario tiene registros asociados. Desactivalo para conservar trazabilidad."
-                )
-            cur.execute("DELETE FROM usuarios WHERE id_usuario = %s RETURNING id_usuario", (user_id,))
-            action = "user_deleted"
-        else:
-            cur.execute(
-                """
-                UPDATE usuarios
-                SET activo = FALSE, updated_at = %s
-                WHERE id_usuario = %s
-                RETURNING id_usuario
-                """,
-                (timestamp, user_id)
-            )
-            action = "user_deactivated"
+        cur.execute(
+            """
+            UPDATE usuarios
+            SET activo = FALSE, updated_at = %s
+            WHERE id_usuario = %s
+            RETURNING id_usuario
+            """,
+            (timestamp, user_id)
+        )
+        action = "user_deactivated"
 
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Usuario no encontrado")

@@ -1,0 +1,23 @@
+flowchart TB
+    B[Buzo] --> LOGIN[Iniciar/cerrar sesión]
+    B --> UP[Cargar imagen y procesar OCR]
+    B --> FEED[Enviar corrección para aprendizaje]
+
+    S[Supervisor] --> LOGIN
+    S --> UP
+    S --> EDIT[Revisar y corregir matriz]
+    S --> VALID[Validar o rechazar registro]
+    S --> DASH[Consultar dashboard y analítica]
+    S --> HIST[Consultar historial y exportar]
+
+    A[Administrador] --> LOGIN
+    A --> UP
+    A --> EDIT
+    A --> VALID
+    A --> DASH
+    A --> HIST
+    A --> USERS[Crear, editar, activar y eliminar usuarios]
+    A --> BOATS[Administrar embarcaciones]
+    A --> BOARDS[Administrar tablillas]
+    A --> AUDIT[Consultar auditoría]
+    A --> DELETE[Supresión lógica y purga autorizada]

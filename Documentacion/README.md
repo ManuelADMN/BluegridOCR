@@ -10,6 +10,11 @@ Indice de la documentacion del proyecto para la entrega final.
 ## Despliegue y mejoras
 
 - [Bitacora_Despliegue_EC2.md](Bitacora_Despliegue_EC2.md): bitacora consolidada del despliegue en AWS EC2 y de las mejoras aplicadas, incluyendo persistencia de imagenes, login, acceso publico, proxy interno y paneles admin.
+- [MATRIZ_TRAZABILIDAD_TECNICA.md](MATRIZ_TRAZABILIDAD_TECNICA.md): relación entre requisitos, código, pruebas y estado técnico.
+- [SEGURIDAD_CREDENCIALES.md](SEGURIDAD_CREDENCIALES.md): acciones aplicadas y rotaciones externas pendientes.
+- [Actas/FE_DE_ERRATAS_EVALUACION_PARCIAL_2.md](Actas/FE_DE_ERRATAS_EVALUACION_PARCIAL_2.md): corrección de la arquitectura preliminar descrita en el acta histórica.
+- [UML/README_ACTUALIZACION.md](UML/README_ACTUALIZACION.md): fuentes Mermaid vigentes y alcance de los PNG históricos.
+- [Gantt/PLAN_CIERRE_REAL.md](Gantt/PLAN_CIERRE_REAL.md): planificación real del cierre con responsable y estado.
 
 ## Evidencias de pruebas
 

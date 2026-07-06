@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from services.db import get_connection
+from services.audit import insert_audit_event
 from psycopg2.extras import RealDictCursor
 from dependencies.auth import require_roles
 
@@ -127,7 +128,9 @@ def get_zonas(
 
 @router.get("/context/embarcaciones")
 def get_embarcaciones(
-    current_user: dict = Depends(require_roles(["admin", "supervisor", "buzo"]))
+    # El buzo no necesita el listado de embarcaciones para digitalizar (solo requiere zonas);
+    # la detección de tablilla/embarcación ocurre server-side. Se restringe a admin/supervisor.
+    current_user: dict = Depends(require_roles(["admin", "supervisor"]))
 ):
     conn = get_connection()
     try:
@@ -195,6 +198,14 @@ def create_embarcacion(
             )
         )
         row = cur.fetchone()
+        insert_audit_event(
+            cur,
+            current_user,
+            action="boat_created",
+            entity="embarcaciones",
+            entity_id=row["id"],
+            detail={"registration": matricula},
+        )
         conn.commit()
         return row
     except Exception as exc:
@@ -249,6 +260,14 @@ def update_embarcacion(
             params,
         )
         row = cur.fetchone()
+        insert_audit_event(
+            cur,
+            current_user,
+            action="boat_updated",
+            entity="embarcaciones",
+            entity_id=embarcacion_id,
+            detail={"fields": updates},
+        )
         conn.commit()
         return row
     except HTTPException:
@@ -263,9 +282,68 @@ def update_embarcacion(
         conn.close()
 
 
+@router.delete("/context/embarcaciones/{embarcacion_id}")
+def delete_embarcacion(
+    embarcacion_id: int,
+    current_user: dict = Depends(require_roles(["admin"]))
+):
+    """Soft-delete a boat so historical OCR relationships remain intact."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        ensure_operational_tables(cur)
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM tablillas
+            WHERE fk_embarcacion = %s
+              AND COALESCE(estado, 'ACTIVA') <> 'BAJA'
+            """,
+            (embarcacion_id,),
+        )
+        if int((cur.fetchone() or {}).get("total") or 0) > 0:
+            raise HTTPException(
+                status_code=409,
+                detail="La embarcación tiene tablillas activas. Dales de baja antes de continuar.",
+            )
+
+        cur.execute(
+            """
+            UPDATE embarcaciones
+            SET estado = 'BAJA'
+            WHERE id_embarcacion = %s
+            RETURNING id_embarcacion AS id
+            """,
+            (embarcacion_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Embarcación no encontrada")
+        insert_audit_event(
+            cur,
+            current_user,
+            action="boat_deactivated",
+            entity="embarcaciones",
+            entity_id=embarcacion_id,
+            detail={"state": "BAJA"},
+        )
+        conn.commit()
+        return {"status": "ok", "id": embarcacion_id, "action": "boat_deactivated"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Error interno al dar de baja la embarcación")
+    finally:
+        conn.close()
+
+
 @router.get("/context/tablillas")
 def get_tablillas(
-    current_user: dict = Depends(require_roles(["admin", "supervisor", "buzo"]))
+    # Igual que embarcaciones: el buzo no consume este listado; la resolución de tablilla
+    # es server-side en operations.py. Se restringe a admin/supervisor.
+    current_user: dict = Depends(require_roles(["admin", "supervisor"]))
 ):
     conn = get_connection()
     try:
@@ -362,6 +440,14 @@ def create_tablilla(
                 """,
                 (row["id"], payload.fk_embarcacion, int(current_user["id"]))
             )
+        insert_audit_event(
+            cur,
+            current_user,
+            action="board_created",
+            entity="tablillas",
+            entity_id=row["id"],
+            detail={"code": codigo, "boat_id": payload.fk_embarcacion},
+        )
         conn.commit()
         return row
     except HTTPException:
@@ -454,6 +540,14 @@ def update_tablilla(
                 (tablilla_id, payload.fk_embarcacion, int(current_user["id"]))
             )
 
+        insert_audit_event(
+            cur,
+            current_user,
+            action="board_updated",
+            entity="tablillas",
+            entity_id=tablilla_id,
+            detail={"fields": updates},
+        )
         conn.commit()
         return {"status": "ok", "updated": True, "id": tablilla_id}
     except HTTPException:
@@ -462,5 +556,57 @@ def update_tablilla(
     except Exception:
         conn.rollback()
         raise HTTPException(status_code=500, detail="Error interno al actualizar tabla")
+    finally:
+        conn.close()
+
+
+@router.delete("/context/tablillas/{tablilla_id}")
+def delete_tablilla(
+    tablilla_id: int,
+    current_user: dict = Depends(require_roles(["admin"]))
+):
+    """Soft-delete a board and close its active assignment history."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        ensure_operational_tables(cur)
+        cur.execute(
+            """
+            UPDATE tablillas
+            SET estado = 'BAJA',
+                updated_by = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id_tablilla = %s
+            RETURNING id_tablilla AS id
+            """,
+            (int(current_user["id"]), tablilla_id),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Tabla no encontrada")
+        cur.execute(
+            """
+            UPDATE tablilla_embarcacion_historial
+            SET activo = FALSE, fecha_fin = CURRENT_TIMESTAMP
+            WHERE fk_tablilla = %s AND activo = TRUE
+            """,
+            (tablilla_id,),
+        )
+        insert_audit_event(
+            cur,
+            current_user,
+            action="board_deactivated",
+            entity="tablillas",
+            entity_id=tablilla_id,
+            detail={"state": "BAJA"},
+        )
+        conn.commit()
+        return {"status": "ok", "id": tablilla_id, "action": "board_deactivated"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Error interno al dar de baja la tabla")
     finally:
         conn.close()

@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 from core.config import settings
 from services.rate_limiter import LoginRateLimiter, login_rate_limiter
 from main import app
+from routers.auth import _client_key
+from starlette.requests import Request
 
 
 class FakeClock:
@@ -23,6 +25,31 @@ class FakeClock:
 
     def advance(self, seconds):
         self.t += seconds
+
+
+def _request(headers: list[tuple[bytes, bytes]] | None = None) -> Request:
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/auth/login",
+        "headers": headers or [],
+        "client": ("203.0.113.10", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "query_string": b"",
+    })
+
+
+def test_client_key_ignora_x_forwarded_for_sin_proxy_confiable(monkeypatch):
+    monkeypatch.setattr(settings, "TRUST_PROXY_HEADERS", False)
+    request = _request([(b"x-forwarded-for", b"198.51.100.99")])
+    assert _client_key(request, "USER@Bluegrid.cl") == "203.0.113.10|user@bluegrid.cl"
+
+
+def test_client_key_usa_x_forwarded_for_con_proxy_confiable(monkeypatch):
+    monkeypatch.setattr(settings, "TRUST_PROXY_HEADERS", True)
+    request = _request([(b"x-forwarded-for", b"198.51.100.99, 10.0.0.2")])
+    assert _client_key(request, "user@bluegrid.cl") == "198.51.100.99|user@bluegrid.cl"
 
 
 def test_no_bloquea_bajo_el_umbral():

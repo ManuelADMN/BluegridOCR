@@ -7,8 +7,10 @@ from services.security import verify_password
 from services.jwt_service import create_access_token
 from services.timezone import app_now_naive
 from services.rate_limiter import login_rate_limiter
+from services.audit import insert_audit_event
 from dependencies.auth import normalize_role
 from core.logger import logger
+from core.config import settings
 
 router = APIRouter(tags=["Auth"])
 
@@ -20,7 +22,7 @@ class LoginPayload(BaseModel):
 def _client_key(request: Request, username: str) -> str:
     """Clave de rate limiting por (IP, usuario). Respeta el primer salto de X-Forwarded-For
     cuando el backend está tras un proxy."""
-    fwd = request.headers.get("x-forwarded-for")
+    fwd = request.headers.get("x-forwarded-for") if settings.TRUST_PROXY_HEADERS else None
     if fwd:
         ip = fwd.split(",")[0].strip()
     else:
@@ -108,6 +110,16 @@ def login(payload: LoginPayload, request: Request):
             WHERE id_usuario = %s
             """,
             (app_now_naive(), row["id_usuario"],)
+        )
+        insert_audit_event(
+            cur,
+            {"id": row["id_usuario"], "username": row["username"], "role": role},
+            action="login_success",
+            entity="usuarios",
+            entity_id=row["id_usuario"],
+            detail={"source": "auth"},
+            ip_origin=key.split("|", 1)[0],
+            user_agent=request.headers.get("user-agent"),
         )
         conn.commit()
 

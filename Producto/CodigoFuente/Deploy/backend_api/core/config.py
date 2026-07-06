@@ -9,8 +9,11 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     APP_TIMEZONE: str = os.getenv("APP_TIMEZONE", "America/Santiago")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-    ANTHROPIC_OCR_AUDIT_MODEL: str = os.getenv("ANTHROPIC_OCR_AUDIT_MODEL", "claude-opus-4-1-20250805")
+    # Modelo del OCR fijado a Claude Sonnet 5.0. Se deja constante (no configurable por
+    # entorno) para garantizar que el motor OCR y su auditoría de conteo usen siempre
+    # el mismo modelo de visión validado.
+    ANTHROPIC_MODEL: str = "claude-sonnet-5"
+    ANTHROPIC_OCR_AUDIT_MODEL: str = "claude-sonnet-5"
 
     # Modo del motor OCR. "segmented" (default) = pipeline actual de recortes/contact sheets.
     # "full_rectangle" = enviar a Claude una sola imagen del rectángulo completo rectificado
@@ -27,6 +30,9 @@ class Settings:
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+    TRUST_PROXY_HEADERS: bool = os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
 
     HOST: str = os.getenv("HOST", "127.0.0.1")
     PORT: int = int(os.getenv("PORT", "8000"))

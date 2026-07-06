@@ -6,6 +6,7 @@ from typing import List, Optional
 MAX_MOTIVO_RECHAZO = 200
 from dependencies.auth import require_roles
 from services.timezone import app_now_naive
+from services.audit import insert_audit_event
 from services import storage
 from core.logger import logger
 
@@ -138,6 +139,14 @@ def validar_registro(
                     )
                 )
 
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_validated",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={"detail_rows": len(detalles)},
+        )
         conn.commit()
         logger.info("[SUPERVISION] detalles_captura guardados: %d filas", len(detalles))
         logger.info("[SUPERVISION] ────────────────────────────────────────────")
@@ -243,6 +252,14 @@ def validar_estado_registro(
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"Registro {registro_id} no encontrado")
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_validated",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={"source": "state_transition"},
+        )
         conn.commit()
         return {"status": "ok", "id_registro": registro_id, "estado": "VALIDADO"}
     except HTTPException:
@@ -282,6 +299,14 @@ def rechazar_registro(
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"Registro {registro_id} no encontrado")
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_rejected",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={"reason": motivo},
+        )
         conn.commit()
         return {"status": "ok", "id_registro": registro_id, "estado": "RECHAZADO"}
     except HTTPException:
@@ -352,6 +377,14 @@ def eliminar_registro(
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"Registro {registro_id} no encontrado")
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_soft_deleted",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={"state": "ELIMINADO"},
+        )
         conn.commit()
         return {"status": "ok", "id_registro": registro_id, "estado": "ELIMINADO"}
     except HTTPException:
@@ -402,11 +435,13 @@ def purgar_registro(
         recortes_purgados = cur.rowcount
 
         # 2) URLs de imagen + estado en registros_ocr.
+        # url_imagen_original es NOT NULL: se vacía con '' (no NULL) para no violar la constraint;
+        # el artefacto real ya se borra del disco en el paso 3. url_imagen_procesada sí admite NULL.
         cur.execute(
             """
             UPDATE registros_ocr
             SET estado_validacion='ELIMINADO',
-                url_imagen_original=NULL,
+                url_imagen_original='',
                 url_imagen_procesada=NULL,
                 rechazo_motivo=COALESCE(rechazo_motivo, 'Datos suprimidos (derecho de supresión)'),
                 validated_at=%s,
@@ -420,6 +455,17 @@ def purgar_registro(
         # 3) Archivos en disco → se borran de forma irreversible. Si falla, revertimos la BD.
         archivos_eliminados = storage.eliminar_directorio(registro_id)
 
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_purged",
+            entity="registros_ocr",
+            entity_id=registro_id,
+            detail={
+                "snippets_removed": recortes_purgados,
+                "files_removed": archivos_eliminados,
+            },
+        )
         conn.commit()
         logger.info(
             "[SUPERVISION] purga registro=%s por usuario=%s recortes=%d archivos=%d",

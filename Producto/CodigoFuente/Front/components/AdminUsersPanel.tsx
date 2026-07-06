@@ -401,6 +401,19 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
     setBoatFormOpen(true);
   };
 
+  const deactivateBoat = async (boat: Embarcacion) => {
+    if (!window.confirm(`¿Dar de baja la embarcación ${boat.name}?`)) return;
+    try {
+      const response = await authFetch(`${apiUrl}/api/v1/context/embarcaciones/${boat.id}`, { method: 'DELETE' });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.detail || 'No se pudo dar de baja la embarcación');
+      onNotify('Embarcación dada de baja correctamente', 'success');
+      fetchData(true);
+    } catch (error: any) {
+      onNotify(error.message || 'No se pudo dar de baja la embarcación', 'error');
+    }
+  };
+
   const saveTable = async () => {
     if (!tableForm.id_tablilla && !tableForm.codigo_tablilla.trim()) {
       onNotify('Completa el ID de tabla Claude', 'error');
@@ -440,6 +453,31 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
       onNotify(error.message || 'No se pudo crear la tabla', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const openEditTable = (table: Tablilla) => {
+    setTableForm({
+      id_tablilla: String(table.id),
+      codigo_tablilla: table.codigo_tablilla,
+      fk_embarcacion: table.fk_embarcacion ? String(table.fk_embarcacion) : '',
+      nombre_referencia: table.nombre_referencia || '',
+      descripcion: table.descripcion || '',
+      estado: table.estado || 'ACTIVA',
+    });
+    setTableFormOpen(true);
+  };
+
+  const deactivateTable = async (table: Tablilla) => {
+    if (!window.confirm(`¿Dar de baja la tabla ${table.codigo_tablilla}?`)) return;
+    try {
+      const response = await authFetch(`${apiUrl}/api/v1/context/tablillas/${table.id}`, { method: 'DELETE' });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.detail || 'No se pudo dar de baja la tabla');
+      onNotify('Tabla dada de baja correctamente', 'success');
+      fetchData(true);
+    } catch (error: any) {
+      onNotify(error.message || 'No se pudo dar de baja la tabla', 'error');
     }
   };
 
@@ -750,6 +788,11 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
                         <Button variant="ghost" size="icon" onClick={() => openEditBoat(boat)} title="Editar embarcación">
                           <Edit3 className="h-4 w-4" />
                         </Button>
+                        {boat.estado !== 'BAJA' && (
+                          <Button variant="ghost" size="icon" onClick={() => deactivateBoat(boat)} title="Dar de baja embarcación">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -793,23 +836,12 @@ export default function AdminUsersPanel({ apiUrl, currentUser, onNotify, activeS
                       <td className="px-4 py-3 text-xs text-gray-500">{table.origen || 'ADMIN_PANEL'}</td>
                       <td className="px-4 py-3 text-xs text-gray-500">{table.updated_at ? formatChileDateTime(table.updated_at) : '-'}</td>
                       <td className="px-4 py-3 text-right">
-                        {!table.fk_embarcacion && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setTableForm({
-                                id_tablilla: String(table.id),
-                                codigo_tablilla: table.codigo_tablilla,
-                                fk_embarcacion: '',
-                                nombre_referencia: table.nombre_referencia || '',
-                                descripcion: table.descripcion || '',
-                                estado: table.estado || 'ACTIVA',
-                              });
-                              setTableFormOpen(true);
-                            }}
-                          >
-                            Asociar
+                        <Button variant="ghost" size="icon" onClick={() => openEditTable(table)} title={table.fk_embarcacion ? 'Editar tabla' : 'Asociar tabla'}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        {table.estado !== 'BAJA' && (
+                          <Button variant="ghost" size="icon" onClick={() => deactivateTable(table)} title="Dar de baja tabla">
+                            <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         )}
                       </td>
