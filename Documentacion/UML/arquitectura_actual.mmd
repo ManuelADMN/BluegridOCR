@@ -1,0 +1,23 @@
+flowchart LR
+    U[Usuario web] -->|HTTPS| N[Nginx / React]
+    N -->|/api/v1 same-origin| API[FastAPI]
+    API --> AUTH[JWT y RBAC]
+    API --> OCR[Pipeline OCR OpenCV]
+    OCR --> IA[Anthropic Claude Vision]
+    API --> DB[(Supabase / PostgreSQL)]
+    API --> FS[(Filesystem /data)]
+    FS -. volumen Docker .-> EBS[(Volumen EBS de EC2)]
+    API --> OBS[/health y /ready]
+
+    subgraph Aplicacion
+      N
+      API
+      AUTH
+      OCR
+      OBS
+    end
+
+    subgraph Servicios externos
+      IA
+      DB
+    end

@@ -1,5 +1,11 @@
 # BluegridOCR — Índice maestro de evidencias por rúbrica
 
+> **Actualización técnica 05-07-2026:** la evidencia histórica de esta carpeta conserva los
+> resultados capturados en mayo/junio. La línea base actual expone 25 rutas `/api/v1` más la
+> raíz y aprueba 52 pruebas backend, 24 frontend, 51% de cobertura de aplicación, ESLint,
+> build Vite, npm audit y pip-audit.
+> La trazabilidad vigente está en `Documentacion/MATRIZ_TRAZABILIDAD_TECNICA.md`.
+
 > Documento generado el 2026-05-28. Mapea cada requisito de la Evaluación Parcial 2 / Capstone con su evidencia concreta en el repositorio.
 
 ---

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -7,8 +7,10 @@ import {
   ClipboardList,
   Eye,
   Droplets,
+  Egg,
   FileText,
   Home,
+  Layers,
   Loader2,
   MapPin,
   MessageSquareText,
@@ -93,31 +95,36 @@ const TrendIcon = ({ value }: { value?: number | null }) => {
 
 const iconForKPI = (id: string) => {
   switch (id) {
-    case 'total_pulpos':
-      return <Waves className="h-6 w-6" />;
-    case 'ocupacion':
-      return <Home className="h-6 w-6" />;
-    case 'tasa_reproductiva':
-      return <Droplets className="h-6 w-6" />;
+    case 'nidos_huevo':
+      return <Egg className="h-5 w-5 md:h-6 md:w-6" />;
+    case 'cuevas_cubiertas':
+      return <Layers className="h-5 w-5 md:h-6 md:w-6" />;
+    case 'hembras_nido':
+      return <Home className="h-5 w-5 md:h-6 md:w-6" />;
+    case 'hembras_cueva':
+      return <Droplets className="h-5 w-5 md:h-6 md:w-6" />;
+    case 'captura_total':
+      return <Waves className="h-5 w-5 md:h-6 md:w-6" />;
     case 'registros_validados':
-      return <ShieldCheck className="h-6 w-6" />;
-    case 'eficiencia_validacion':
-      return <ShieldCheck className="h-6 w-6" />;
+      return <ShieldCheck className="h-5 w-5 md:h-6 md:w-6" />;
     default:
-      return <Activity className="h-6 w-6" />;
+      return <Activity className="h-5 w-5 md:h-6 md:w-6" />;
   }
 };
 
 const ringToneForKPI = (id: string) => {
   switch (id) {
-    case 'total_pulpos':
-      return 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300';
-    case 'ocupacion':
+    case 'nidos_huevo':
+      return 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300';
+    case 'cuevas_cubiertas':
       return 'bg-teal-50 text-teal-600 dark:bg-teal-500/10 dark:text-teal-300';
-    case 'tasa_reproductiva':
+    case 'hembras_nido':
       return 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300';
+    case 'hembras_cueva':
+      return 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300';
+    case 'captura_total':
+      return 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300';
     case 'registros_validados':
-    case 'eficiencia_validacion':
       return 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-300';
     default:
       return 'bg-gray-100 text-gray-600 dark:bg-zinc-900 dark:text-zinc-300';
@@ -224,13 +231,14 @@ const KpiCard = ({
   tone: string;
   onClick?: () => void;
 }) => (
-  <Panel className={`p-3 ${onClick ? 'cursor-pointer transition-colors hover:border-blue-300 dark:hover:border-blue-500/50' : ''}`} onClick={onClick}>
-    <div className="flex min-w-0 items-center gap-3">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${tone}`}>{icon}</div>
+  <Panel className={`flex h-full flex-col justify-center p-2.5 md:p-3 ${onClick ? 'cursor-pointer transition-colors hover:border-blue-300 dark:hover:border-blue-500/50' : ''}`} onClick={onClick}>
+    <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:h-12 md:w-12 ${tone}`}>{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-bold text-gray-600 dark:text-gray-300">{label}</p>
-        <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-black dark:text-white">{formatNumber(value, unit)}</p>
-        <p className="mt-1.5 truncate text-[11px] text-gray-400 dark:text-zinc-500">Periodo filtrado</p>
+        {/* Etiqueta hasta 2 líneas: evita truncate destructivo en móvil de 2 columnas. */}
+        <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-600 md:text-xs dark:text-gray-300">{label}</p>
+        <p className="mt-0.5 truncate text-lg font-semibold tracking-tight text-black md:text-2xl dark:text-white">{formatNumber(value, unit)}</p>
+        <p className="mt-1.5 hidden truncate text-[11px] text-gray-400 md:block dark:text-zinc-500">Periodo filtrado</p>
       </div>
     </div>
   </Panel>
@@ -259,6 +267,11 @@ export default function Dashboard({
   const [actionIntent, setActionIntent] = useState<'validar' | 'rechazar' | 'eliminar' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [deletedRecordIds, setDeletedRecordIds] = useState<Set<number>>(() => new Set());
+  // Guard de concurrencia: solo la respuesta más reciente puede aplicar setData. Evita que una
+  // respuesta lenta del auto-refresh (setInterval 30s) pise el estado tras validar/rechazar/eliminar.
+  const latestFetchId = useRef(0);
+  // Ids rechazados en esta sesión: se ocultan de pendientes aunque llegue un snapshot obsoleto.
+  const rejectedRecordIds = useRef<Set<number>>(new Set());
 
   const isAdmin = currentUser?.role === 'admin';
   const canModerate = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
@@ -303,6 +316,24 @@ export default function Dashboard({
     };
   }, [selectedRecord?.id_registro, canViewImages]);
 
+  // Oculta de un snapshot los registros ya eliminados/rechazados en esta sesión, por si una
+  // respuesta obsoleta (o previa a la mutación) todavía los trae como pendientes.
+  const sanitizeDashboard = (incoming: DashboardResponse): DashboardResponse => {
+    const isGone = (record: ReportRecord) => {
+      const id = Number(record.id_registro);
+      return deletedRecordIds.has(id) || rejectedRecordIds.current.has(id);
+    };
+    return {
+      ...incoming,
+      recentRecords: (incoming.recentRecords || []).map(record =>
+        rejectedRecordIds.current.has(Number(record.id_registro))
+          ? { ...record, estado_validacion: 'RECHAZADO' }
+          : record
+      ),
+      pendingRecords: (incoming.pendingRecords || []).filter(record => !isGone(record)),
+    };
+  };
+
   const fetchDashboardData = async (silent = false) => {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
@@ -310,6 +341,8 @@ export default function Dashboard({
     setError(null);
     const baseUrl = localStorage.getItem('bluegrid_api_url') || getApiBaseUrl();
     const enableMockData = import.meta.env.VITE_ENABLE_MOCK_DATA === 'true';
+    const requestId = ++latestFetchId.current;
+    const isStale = () => requestId !== latestFetchId.current;
 
     try {
       const cleanUrl = baseUrl.replace(/\/+$/, '');
@@ -324,13 +357,19 @@ export default function Dashboard({
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
 
-      setData(await response.json());
+      const payload = await response.json();
+      // Solo aplica si sigue siendo la petición más reciente (evita la carrera con el auto-refresh).
+      if (isStale()) return;
+      setData(sanitizeDashboard(payload));
     } catch (err: any) {
+      if (isStale()) return;
       if (enableMockData) setData(emptyDashboard);
       else setError(err.message || 'Error al cargar datos del dashboard');
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (!isStale()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   };
 
@@ -342,11 +381,11 @@ export default function Dashboard({
 
   const getKpi = (id: string) => data?.kpis.find(kpi => kpi.id === id);
 
-  const totalPulposKpi = getKpi('total_pulpos') || data?.kpis[0];
-  const ocupacionKpi = getKpi('ocupacion') || data?.kpis[1];
+  const totalPulposKpi = getKpi('captura_total') || data?.kpis[0];
+  const ocupacionKpi = getKpi('nidos_huevo') || data?.kpis[1];
 
   const dashboardKpis = useMemo(() => {
-    const preferredOrder = ['total_pulpos', 'ocupacion', 'registros_validados', 'tasa_reproductiva', 'eficiencia_validacion'];
+    const preferredOrder = ['nidos_huevo', 'cuevas_cubiertas', 'hembras_nido', 'hembras_cueva', 'captura_total', 'registros_validados'];
     const incoming = data?.kpis || [];
     const ordered = preferredOrder
       .map(id => incoming.find(kpi => kpi.id === id))
@@ -496,6 +535,23 @@ export default function Dashboard({
           };
         });
       }
+      if (action === 'rechazar') {
+        // Optimista: el rechazado sale de pendientes de inmediato y no reaparece aunque llegue
+        // un snapshot obsoleto (rejectedRecordIds lo re-marca en sanitizeDashboard).
+        rejectedRecordIds.current.add(recordId);
+        setData(current => {
+          if (!current) return current;
+          return {
+            ...current,
+            pendingRecords: (current.pendingRecords || []).filter(record => Number(record.id_registro) !== recordId),
+            recentRecords: (current.recentRecords || []).map(record =>
+              Number(record.id_registro) === recordId
+                ? { ...record, estado_validacion: 'RECHAZADO' }
+                : record
+            ),
+          };
+        });
+      }
       onNotify?.(
         action === 'eliminar' && response.status === 404
           ? 'El registro ya había sido eliminado.'
@@ -600,7 +656,8 @@ export default function Dashboard({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {/* Móvil: 2 columnas (1 sola bajo 340px). 6 KPIs → 3 cols en lg, 6 en xl. */}
+        <div className="grid grid-cols-1 gap-2.5 min-[340px]:grid-cols-2 md:gap-3 lg:grid-cols-3 xl:grid-cols-6">
           {dashboardKpis.map(kpi => (
             <KpiCard
               key={kpi.id}
@@ -619,11 +676,11 @@ export default function Dashboard({
           <Panel className="p-3 xl:col-span-4">
             <SectionHeader
               icon={<Waves className="h-4 w-4 text-blue-600" />}
-              title="Total Pulpos"
+              title="Captura Total"
             />
             <div className="h-[195px]">
               {totalPulposKpi?.series?.length ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <LineChart data={totalPulposKpi.series} margin={{ top: 6, right: 10, left: -14, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGrid} />
                     <XAxis dataKey="name" interval="preserveStartEnd" minTickGap={24} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#7b8493' }} dy={8} />
@@ -641,11 +698,11 @@ export default function Dashboard({
           <Panel className="p-3 xl:col-span-5">
             <SectionHeader
               icon={<Home className="h-4 w-4 text-teal-600" />}
-              title="Nidos encontrados"
+              title="N° Nidos con Huevo"
             />
             <div className="h-[195px]">
               {ocupacionKpi?.series?.length ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <LineChart data={ocupacionKpi.series} margin={{ top: 6, right: 10, left: -14, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGrid} />
                     <XAxis dataKey="name" interval="preserveStartEnd" minTickGap={24} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#7b8493' }} dy={8} />
@@ -697,7 +754,7 @@ export default function Dashboard({
             <SectionHeader icon={<Calendar className="h-4 w-4 text-blue-600" />} title="Capturas por día" meta="Capturas" />
             <div className="h-[205px]">
               {data.barData.length ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <BarChart data={data.barData} margin={{ top: 14, right: 6, left: -14, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGrid} />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#7b8493' }} dy={8} />
@@ -716,7 +773,7 @@ export default function Dashboard({
             <SectionHeader icon={<MapPin className="h-4 w-4 text-teal-600" />} title="Top Sectores" meta="Pulpos capturados" />
             <div className="h-[205px]">
               {horizontalBarData.length ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <BarChart data={horizontalBarData} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#606976' }} width={92} />
@@ -731,33 +788,39 @@ export default function Dashboard({
           </Panel>
 
           <Panel className="overflow-hidden xl:col-span-5">
-            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_88px_108px_86px] gap-2 border-b border-gray-200 bg-white px-3 py-3 text-[11px] font-bold text-gray-700 dark:border-zinc-800 dark:bg-[#111113] dark:text-gray-300">
-              <span className="truncate">Sector</span>
-              <span className="truncate">Buzo</span>
-              <span className="truncate">Confianza</span>
-              <span className="truncate">Estado</span>
-              <span className="truncate text-right">Fecha</span>
-            </div>
-            <div className="divide-y divide-gray-100 dark:divide-zinc-900">
-              {validationRows.length ? (
-                validationRows.map((row, index) => (
-                  <button key={`${row.sector}-${index}`} onClick={() => openRecord(row.raw)} className="grid w-full grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_88px_108px_86px] items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-zinc-900/50">
-                    <span className="truncate font-semibold text-gray-800 dark:text-gray-100">{row.sector}</span>
-                    <span className="truncate text-gray-600 dark:text-gray-300">{row.buzo}</span>
-                    <span className="min-w-0">
-                      <Badge tone={row.confidence >= 84 ? 'success' : 'warning'} className="whitespace-nowrap">{row.confidence}%</Badge>
-                    </span>
-                    <span className="min-w-0">
-                      <Badge tone={String(row.status).toUpperCase() === 'VALIDADO' ? 'success' : 'warning'} className="max-w-full truncate whitespace-nowrap">{row.status}</Badge>
-                    </span>
-                    <span className="truncate text-right text-gray-500 dark:text-gray-400">{row.date}</span>
-                  </button>
-                ))
-              ) : (
-                <div className="flex h-[205px] items-center justify-center text-xs font-semibold text-gray-400">
-                  Sin registros validados para mostrar
+            {/* Scroll horizontal interno en móvil (min-width) para no deformar ni superponer
+                columnas entre 360-767px; en desktop fluye natural (md:min-w-0). */}
+            <div className="overflow-x-auto">
+              <div className="min-w-[560px] md:min-w-0">
+                <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_88px_108px_86px] gap-2 border-b border-gray-200 bg-white px-3 py-3 text-[11px] font-bold text-gray-700 dark:border-zinc-800 dark:bg-[#111113] dark:text-gray-300">
+                  <span className="truncate">Sector</span>
+                  <span className="truncate">Buzo</span>
+                  <span className="truncate">Confianza</span>
+                  <span className="truncate">Estado</span>
+                  <span className="truncate text-right">Fecha</span>
                 </div>
-              )}
+                <div className="divide-y divide-gray-100 dark:divide-zinc-900">
+                  {validationRows.length ? (
+                    validationRows.map((row, index) => (
+                      <button key={`${row.sector}-${index}`} onClick={() => openRecord(row.raw)} className="grid w-full grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_88px_108px_86px] items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-zinc-900/50">
+                        <span className="truncate font-semibold text-gray-800 dark:text-gray-100">{row.sector}</span>
+                        <span className="truncate text-gray-600 dark:text-gray-300">{row.buzo}</span>
+                        <span className="min-w-0">
+                          <Badge tone={row.confidence >= 84 ? 'success' : 'warning'} className="whitespace-nowrap">{row.confidence}%</Badge>
+                        </span>
+                        <span className="min-w-0">
+                          <Badge tone={String(row.status).toUpperCase() === 'VALIDADO' ? 'success' : 'warning'} className="max-w-full truncate whitespace-nowrap">{row.status}</Badge>
+                        </span>
+                        <span className="truncate text-right text-gray-500 dark:text-gray-400">{row.date}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="flex h-[205px] items-center justify-center text-xs font-semibold text-gray-400">
+                      Sin registros validados para mostrar
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="border-t border-gray-100 px-4 py-2.5 text-center dark:border-zinc-900">
               <button className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400">

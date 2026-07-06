@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Save, RotateCcw, AlertCircle, AlertTriangle, ZoomIn, ZoomOut, Eye, EyeOff, Image as ImageIcon, Maximize, Ship, Table2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Save, RotateCcw, AlertCircle, AlertTriangle, ZoomIn, ZoomOut, Eye, EyeOff, Image as ImageIcon, Maximize, Ship, Table2, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { MatrixCell, OCRResponse, User } from '../types';
 import { authFetch } from '../services/apiClient';
 import { getApiBaseUrl } from '../services/runtimeConfig';
@@ -21,8 +21,21 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
   const [originalCells, setOriginalCells] = useState<MatrixCell[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showImage, setShowImage] = useState(true);
+  // Revisión móvil: celdas ya revisadas, índice de navegación de errores y confirmación de abandono.
+  const [reviewed, setReviewed] = useState<Set<string>>(() => new Set());
+  const [errorIndex, setErrorIndex] = useState(0);
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const LOW_CONFIDENCE = 0.85;
   const tablillaMeta = data.resultado_ia?.tablilla_detectada;
   const embarcacionDetectada = tablillaMeta?.embarcacion;
+
+  const registerInput = useCallback((key: string, el: HTMLInputElement | null) => {
+    inputRefs.current[key] = el;
+  }, []);
+  const markReviewed = useCallback((key: string) => {
+    setReviewed(prev => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, []);
 
   // Initialize cells when data loads - Adaptation for Bluegrid_OCRv2
   useEffect(() => {
@@ -98,6 +111,63 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
     return rows;
   }, [cells]);
 
+  // Celdas totales presentes y celdas de baja confianza (para progreso y navegación de errores).
+  const allKeys = useMemo(
+    () => gridRows.flatMap(row => row.columns.map((cell, c) => (cell ? `${row.index}-${c}` : null)).filter(Boolean) as string[]),
+    [gridRows]
+  );
+  const lowConfidenceKeys = useMemo(
+    () =>
+      gridRows.flatMap(row =>
+        row.columns
+          .map((cell, c) => (cell && cell.confianza < LOW_CONFIDENCE ? `${row.index}-${c}` : null))
+          .filter(Boolean) as string[]
+      ),
+    [gridRows]
+  );
+  const reviewedCount = allKeys.filter(k => reviewed.has(k)).length;
+  const totalToReview = allKeys.length;
+
+  // ¿Hay cambios sin guardar respecto al OCR original?
+  const dirty = useMemo(() => {
+    if (cells.length !== originalCells.length) return true;
+    return cells.some(cell => {
+      const original = originalCells.find(
+        oc => parseRowIndex(oc.fila) === parseRowIndex(cell.fila) && Number(oc.col) === Number(cell.col)
+      );
+      return !original || original.valor !== cell.valor;
+    });
+  }, [cells, originalCells]);
+
+  // Aviso del navegador al cerrar/recargar con cambios sin guardar.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const focusErrorAt = (index: number) => {
+    if (lowConfidenceKeys.length === 0) return;
+    const bounded = (index + lowConfidenceKeys.length) % lowConfidenceKeys.length;
+    setErrorIndex(bounded);
+    const key = lowConfidenceKeys[bounded];
+    const el = inputRefs.current[key];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus({ preventScroll: true });
+      markReviewed(key);
+    }
+  };
+
+  const requestCancel = () => {
+    if (dirty) setShowAbandonConfirm(true);
+    else onCancel();
+  };
+
   const handleValueChange = (rowIndex: number, colIndex: number, newValue: string) => {
     setCells(prev => {
       const existingIndex = prev.findIndex(c => parseRowIndex(c.fila) === rowIndex && Number(c.col) === colIndex);
@@ -168,7 +238,7 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
   return (
     <div className="animate-in fade-in zoom-in duration-300 pb-20 w-full">
       {/* Header Toolbar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 pb-6 border-b border-gray-200 dark:border-zinc-800 transition-colors sticky top-16 md:static bg-gray-50 dark:bg-[#050505] z-30 md:z-auto pt-4 md:pt-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 pb-6 border-b border-gray-200 dark:border-zinc-800 transition-colors sticky top-0 md:static bg-gray-50 dark:bg-[#050505] z-30 md:z-auto pt-4 md:pt-0">
         <div className="space-y-1">
           <h2 className="text-3xl font-semibold tracking-tighter text-black dark:text-white">Planilla Digitalizada</h2>
           <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
@@ -205,8 +275,8 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
         </div>
         <div className="flex gap-3 w-full md:w-auto fixed bottom-20 right-4 md:static md:bottom-auto md:right-auto z-40 justify-end md:justify-start pointer-events-none md:pointer-events-auto">
            {/* Mobile Floating Action Buttons or Desktop Static Buttons */}
-          <button 
-            onClick={onCancel}
+          <button
+            onClick={requestCancel}
             className="pointer-events-auto inline-flex items-center justify-center rounded-full text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black dark:focus-visible:ring-white disabled:pointer-events-none disabled:opacity-50 border border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#050505] shadow-lg md:shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-900 hover:text-black dark:hover:text-white dark:text-gray-200 h-12 md:h-12 w-12 md:w-auto md:px-6 md:py-2"
             title="Descartar"
           >
@@ -324,6 +394,57 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
         {/* Right Column: Data Editor */}
         <div className="flex-1 w-full min-w-0">
           
+          {/* --- MOBILE REVIEW TOOLBAR (solo móvil): progreso + navegación de errores --- */}
+          <div className="md:hidden mb-4 rounded-[2rem] border border-gray-200 dark:border-zinc-800 bg-white dark:bg-[#050505] p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-zinc-400">
+                Progreso de revisión
+              </span>
+              <span className="text-xs font-bold text-black dark:text-white">
+                {reviewedCount}/{totalToReview} celdas
+              </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-900">
+              <div
+                className="h-full rounded-full bg-black dark:bg-white transition-all duration-300"
+                style={{ width: `${totalToReview ? Math.round((reviewedCount / totalToReview) * 100) : 0}%` }}
+              />
+            </div>
+
+            {lowConfidenceKeys.length > 0 ? (
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-yellow-700 dark:text-yellow-500">
+                  <AlertTriangle className="h-4 w-4" />
+                  {lowConfidenceKeys.length} celda{lowConfidenceKeys.length > 1 ? 's' : ''} de baja confianza
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => focusErrorAt(errorIndex - 1)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
+                    aria-label="Error anterior"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-[2.5rem] text-center text-xs font-mono font-bold text-gray-500 dark:text-gray-400">
+                    {errorIndex + 1}/{lowConfidenceKeys.length}
+                  </span>
+                  <button
+                    onClick={() => focusErrorAt(errorIndex + 1)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-gray-600 dark:text-gray-300 active:scale-95 transition-transform"
+                    aria-label="Siguiente error"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />
+                Sin celdas de baja confianza. Revisa y guarda.
+              </div>
+            )}
+          </div>
+
           {/* --- MOBILE CARD VIEW (Block on md-, Hidden on md+) --- */}
           <div className="md:hidden space-y-4">
             {gridRows.map((row) => (
@@ -337,11 +458,11 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase text-gray-500 tracking-widest">N° Nidos</label>
-                      {renderMobileInput(row, 0, handleValueChange, originalCells)}
+                      {renderMobileInput(row, 0, handleValueChange, originalCells, registerInput, markReviewed)}
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase text-gray-500 tracking-widest">N° Cuevas</label>
-                      {renderMobileInput(row, 1, handleValueChange, originalCells)}
+                      {renderMobileInput(row, 1, handleValueChange, originalCells, registerInput, markReviewed)}
                     </div>
                   </div>
                   
@@ -350,18 +471,18 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">Nido</label>
-                          {renderMobileInput(row, 2, handleValueChange, originalCells)}
+                          {renderMobileInput(row, 2, handleValueChange, originalCells, registerInput, markReviewed)}
                        </div>
                        <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">Cueva</label>
-                          {renderMobileInput(row, 3, handleValueChange, originalCells)}
+                          {renderMobileInput(row, 3, handleValueChange, originalCells, registerInput, markReviewed)}
                        </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase text-gray-500 tracking-widest">Captura Total</label>
-                    {renderMobileInput(row, 4, handleValueChange, originalCells)}
+                    {renderMobileInput(row, 4, handleValueChange, originalCells, registerInput, markReviewed)}
                   </div>
                 </div>
               </div>
@@ -469,24 +590,62 @@ const MatrixEditor: React.FC<MatrixEditorProps> = ({ data, imageUrl, imageRotati
           </div>
         </div>
       </div>
+
+      {/* Confirmación antes de abandonar una digitalización con cambios sin guardar. */}
+      {showAbandonConfirm && (
+        <div className="fixed inset-0 z-[3200] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-[#0b0b0c]">
+            <div className="mb-3 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-black dark:text-white">Descartar digitalización</h3>
+                <p className="mt-1 text-sm leading-6 text-gray-500 dark:text-zinc-400">
+                  Tienes correcciones sin guardar. Si sales ahora se perderán y volverás a la carga de imagen.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setShowAbandonConfirm(false)}
+                className="inline-flex h-10 items-center justify-center rounded-full border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-zinc-800 dark:bg-[#050505] dark:text-gray-200 dark:hover:bg-zinc-900"
+              >
+                Seguir revisando
+              </button>
+              <button
+                onClick={() => { setShowAbandonConfirm(false); onCancel(); }}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-red-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Descartar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // Helper for mobile inputs to keep JSX clean
 function renderMobileInput(
-  row: {index: number, columns: (MatrixCell | null)[]}, 
-  colIndex: number, 
+  row: {index: number, columns: (MatrixCell | null)[]},
+  colIndex: number,
   onChange: (r: number, c: number, v: string) => void,
-  originalCells: MatrixCell[]
+  originalCells: MatrixCell[],
+  registerInput: (key: string, el: HTMLInputElement | null) => void,
+  markReviewed: (key: string) => void
 ) {
   const cell = row.columns[colIndex];
   const isLowConfidence = cell ? cell.confianza < 0.85 : false;
   const val = cell ? cell.valor : "";
-  
+  const key = `${row.index}-${colIndex}`;
+  // Nidos/Cuevas/Total son numéricos → teclado numérico. Hembras (2,3) usan marca "X".
+  const isNumericCol = colIndex === 0 || colIndex === 1 || colIndex === 4;
+
   // Find original value for data-original attribute
-  const originalCell = originalCells.find(oc => 
-     (typeof oc.fila === 'string' ? parseInt(oc.fila.match(/(\d+)/)?.[1] || "0") - 1 : oc.fila) === row.index && 
+  const originalCell = originalCells.find(oc =>
+     (typeof oc.fila === 'string' ? parseInt(oc.fila.match(/(\d+)/)?.[1] || "0") - 1 : oc.fila) === row.index &&
      Number(oc.col) === colIndex
   );
 
@@ -494,8 +653,11 @@ function renderMobileInput(
     <div className="relative">
       <input
         type="text"
+        inputMode={isNumericCol ? 'numeric' : 'text'}
+        ref={el => registerInput(key, el)}
         value={val}
-        onChange={(e) => onChange(row.index, colIndex, e.target.value)}
+        onChange={(e) => { onChange(row.index, colIndex, e.target.value); markReviewed(key); }}
+        onFocus={() => markReviewed(key)}
         // Metadata for DOM scraping / Training feedback
         data-fila={row.index}
         data-col={colIndex}

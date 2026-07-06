@@ -5,6 +5,12 @@ __pycache__/
 node_modules/
 dist/
 build/
+.coverage
+coverage.xml
+htmlcov/
+.playwright-cli/
+output/playwright/
 .venv/
 venv/
 .DS_Store
+.claude

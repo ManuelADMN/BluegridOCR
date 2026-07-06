@@ -15,12 +15,13 @@ services:
       DATABASE_URL: ${DATABASE_URL:-}
       SUPABASE_KEY: ${SUPABASE_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-not-configured}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
-      ANTHROPIC_OCR_AUDIT_MODEL: ${ANTHROPIC_OCR_AUDIT_MODEL:-claude-opus-4-8}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      ANTHROPIC_OCR_AUDIT_MODEL: ${ANTHROPIC_OCR_AUDIT_MODEL:-claude-sonnet-5}
       OCR_MODE: ${OCR_MODE:-segmented}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-not-configured}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      TRUST_PROXY_HEADERS: "true"
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3001}
       # Almacenamiento de imágenes en disco (reemplazo de Blob Storage).
       STORAGE_ROOT: ${STORAGE_ROOT:-/data}
@@ -54,7 +55,9 @@ services:
       ENABLE_INTERNAL_API_PROXY: "${ENABLE_INTERNAL_API_PROXY:-true}"
       API_BASE_URL: "${API_BASE_URL-}"
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      # Publicado en el puerto 80 del host: la app queda en http://<host> sin ":3000".
+      # (Requiere abrir el puerto 80/TCP en el Security Group de la EC2.)
+      - "${FRONTEND_PORT:-80}:80"
     depends_on:
       backend:
         condition: service_healthy

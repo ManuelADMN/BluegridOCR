@@ -85,11 +85,11 @@ txt/00_resumen_generacion_evidencias.json
 
 ## Acceso de Evaluacion
 
-| Usuario | Contrasena | Rol |
+| Usuario | Credencial | Rol |
 | --- | --- | --- |
-| `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
+| `admin@bluegrid.cl` | Definida fuera de Git mediante `ADMIN_PASSWORD` | `admin` |
 
-El usuario fue actualizado en la base de datos y validado con login HTTP 200. Por seguridad, los tokens JWT no se guardan en los archivos de evidencia.
+El usuario fue actualizado en la base de datos y validado con login HTTP 200. Por seguridad, la contrasena y los tokens JWT no se guardan en los archivos de evidencia.
 
 ## Regeneracion
 
