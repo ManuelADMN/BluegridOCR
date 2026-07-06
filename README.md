@@ -318,8 +318,8 @@ ENVIRONMENT=development
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
 APP_TIMEZONE=America/Santiago
 ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-sonnet-4-6
-ANTHROPIC_OCR_AUDIT_MODEL=claude-sonnet-4-6
+ANTHROPIC_MODEL=claude-sonnet-5
+ANTHROPIC_OCR_AUDIT_MODEL=claude-sonnet-5
 JWT_SECRET_KEY=replace_with_a_long_random_secret
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=480
@@ -537,17 +537,17 @@ Producto/CodigoFuente/Deploy/backend_api/sql/
 
 Usuario administrador de evaluacion:
 
-| Usuario | Contrasena | Rol |
-| ------- | ------------------ | --- |
-| `admin@bluegrid.cl` | `BGCwc5NLVULdnmItX7` | `admin` |
+| Usuario | Credencial | Rol |
+| ------- | ---------- | --- |
+| `admin@bluegrid.cl` | Definida fuera de Git mediante `ADMIN_PASSWORD` | `admin` |
 
-Este usuario permite entrar como administrador y revisar todo el sistema durante la evaluacion. Se recomienda cambiar o rotar esta contrasena despues de la entrega.
+Este usuario permite entrar como administrador y revisar todo el sistema durante la evaluacion. La contrasena debe compartirse por un canal seguro y rotarse si alguna vez fue publicada.
 
 Para recrearlo o actualizarlo contra la base de datos:
 
 ```powershell
 cd Producto/CodigoFuente/Deploy/backend_api
-$env:ADMIN_PASSWORD="BGCwc5NLVULdnmItX7"
+$env:ADMIN_PASSWORD=Read-Host "Nueva contrasena admin"
 python create_admin.py --username admin@bluegrid.cl
 ```
 

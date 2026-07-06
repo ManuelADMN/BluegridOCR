@@ -8,6 +8,9 @@ import {
 import SettingsModal from './components/SettingsModal';
 import MatrixEditor from './components/MatrixEditor';
 import Dashboard from './components/Dashboard';
+import MobileHeader from './components/MobileHeader';
+import MobileNavigationDrawer from './components/MobileNavigationDrawer';
+import ImageConfirmModal from './components/ImageConfirmModal';
 import NotificationToast, { NotificationTone } from './components/NotificationToast';
 import { BluegridLogo } from './components/BluegridLogo';
 import AdminUsersPanel from './components/AdminUsersPanel';
@@ -20,6 +23,7 @@ import { SelectControl } from './components/ui/form-controls';
 import { authFetch } from './services/apiClient';
 import { getApiBaseUrl } from './services/runtimeConfig';
 import { bgoLog } from './services/logger';
+import { compressImage, analyzeImage, ImageAnalysis } from './services/imageProcessing';
 import { 
   OCRResponse, MOCK_ZONES, AppView, User, UserRole, MatrixCell, ZoneOption,
   Permission, hasRolePermission 
@@ -138,13 +142,20 @@ export default function App() {
   const [zonesError,     setZonesError]     = useState<string | null>(null);
   const [isUploading,    setIsUploading]    = useState(false);
   const [uploadError,    setUploadError]    = useState<string | null>(null);
+  // Validación previa de la imagen (formato, tamaño, resolución, orientación, exposición, foco).
+  const [imageAnalysis,  setImageAnalysis]  = useState<ImageAnalysis | null>(null);
+  const [isAnalyzing,    setIsAnalyzing]    = useState(false);
+  // Panel emergente de confirmación de orientación tras subir/capturar la imagen.
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Datos OCR
   const [ocrData,    setOcrData]    = useState<OCRResponse | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Mobile menu
+  // Mobile menu (menú de captura FAB — NO reutilizar para navegación)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Navegación móvil por roles (panel lateral) — estado independiente del FAB de captura.
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -326,89 +337,53 @@ export default function App() {
       setSelectedFile(file);
       setRotationDeg(0);
       setUploadError(null);
+      setImageAnalysis(null);
       setCurrentModule('ocr');
       setView('upload');
       setIsMobileMenuOpen(false);
+      setShowConfirmModal(true); // panel emergente para confirmar orientación / rotar / enviar
       showNotification(`${file.name} quedo lista para previsualizar y enviar al motor OCR.`, 'info', 'Imagen cargada');
+
+      // Validación previa asíncrona (no bloquea la UI). Los errores impiden el envío;
+      // los avisos (orientación/exposición/foco) solo advierten.
+      setIsAnalyzing(true);
+      analyzeImage(file)
+        .then(result => {
+          setImageAnalysis(result);
+          bgoLog.info('UPLOAD', `Validación imagen: ok=${result.ok}  errores=${result.errors.length}  avisos=${result.warnings.length}  ${result.meta ? `dim=${result.meta.width}x${result.meta.height} luma=${result.meta.luma?.toFixed(0)} grad=${result.meta.gradient?.toFixed(1)}` : ''}`);
+          if (!result.ok) showNotification(result.errors[0], 'error', 'Imagen no apta');
+        })
+        .catch(err => bgoLog.error('UPLOAD', `Validación falló: ${err.message}`))
+        .finally(() => setIsAnalyzing(false));
     }
+    // Permite volver a seleccionar el mismo archivo (dispara onChange de nuevo).
+    e.target.value = '';
   };
 
   // previewUrl se revoca explícitamente en resetFlow y handleFileSelect
 
-  // ── Compresión de imagen ──────────────────────────────────────────────────
-  const compressImage = (file: File, rotation: number = 0): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-
-        // Calidad/resolución más altas para preservar los 4 puntos rojos de las esquinas:
-        // la compresión agresiva los desatura y rompía la detección/rectificado (warp) en backend.
-        const MAX_PX  = 1920;
-        const QUALITY = 0.92;
-        const swapped = rotation === 90 || rotation === 270;
-
-        // Escalar sobre las dimensiones originales
-        let drawW = img.width;
-        let drawH = img.height;
-        if (drawW > MAX_PX || drawH > MAX_PX) {
-          const scale = Math.min(MAX_PX / drawW, MAX_PX / drawH);
-          drawW = Math.round(drawW * scale);
-          drawH = Math.round(drawH * scale);
-        }
-
-        // El canvas tiene las dimensiones ya rotadas
-        const canvas = document.createElement('canvas');
-        canvas.width  = swapped ? drawH : drawW;
-        canvas.height = swapped ? drawW : drawH;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Canvas no disponible')); return; }
-
-        ctx.save();
-        if (rotation === 90) {
-          ctx.translate(canvas.width, 0);
-          ctx.rotate(Math.PI / 2);
-        } else if (rotation === 180) {
-          ctx.translate(canvas.width, canvas.height);
-          ctx.rotate(Math.PI);
-        } else if (rotation === 270) {
-          ctx.translate(0, canvas.height);
-          ctx.rotate(-Math.PI / 2);
-        }
-        ctx.drawImage(img, 0, 0, drawW, drawH);
-        ctx.restore();
-
-        canvas.toBlob(
-          blob => {
-            if (blob) resolve(blob);
-            else reject(new Error('Error al comprimir imagen'));
-          },
-          'image/jpeg',
-          QUALITY
-        );
-      };
-
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Error al leer imagen')); };
-      img.src = url;
-    });
-  };
-
   // ── Upload → Claude Vision ────────────────────────────────────────────────
   const handleUpload = async () => {
+    if (isUploading) return; // evita envíos duplicados (doble tap / doble click)
     if (!selectedFile) { setUploadError('Selecciona una imagen primero.'); return; }
     if (!selectedZone) { setUploadError('Selecciona un centro de cultivo válido.'); return; }
+    // No enviar una imagen claramente inválida: entrega el primer error accionable.
+    if (imageAnalysis && !imageAnalysis.ok) {
+      setUploadError(imageAnalysis.errors[0]);
+      showNotification(imageAnalysis.errors[0], 'error', 'Imagen no apta');
+      return;
+    }
     setIsUploading(true);
     setUploadError(null);
 
     try {
+      const startedAt    = performance.now();
       const originalKB   = Math.round(selectedFile.size / 1024);
       bgoLog.step('UPLOAD', `Comprimiendo imagen... tamaño_original=${originalKB}KB  rotación=${rotationDeg}°  zona_id=${selectedZone}`);
       const compressed   = await compressImage(selectedFile, rotationDeg);
       const compressedKB = Math.round(compressed.size / 1024);
-      bgoLog.info('UPLOAD', `Compresión: ${originalKB}KB → ${compressedKB}KB`);
+      const processingMs = Math.round(performance.now() - startedAt);
+      bgoLog.info('UPLOAD', `Compresión: ${originalKB}KB → ${compressedKB}KB en ${processingMs}ms`);
 
       const formData = new FormData();
       formData.append('file', compressed, 'tablilla.jpg');
@@ -509,6 +484,7 @@ export default function App() {
     setSelectedFile(null);
     setRotationDeg(0);
     setOcrData(null);
+    setImageAnalysis(null);
     setView('upload');
     setSuccessMsg(null);
   };
@@ -518,6 +494,8 @@ export default function App() {
   const canManageUsers   = hasRolePermission(user?.role, 'users:create');
   const canDigitalize    = hasRolePermission(user?.role, 'ocr:digitalize');
   const canViewBuzoAnalytics = hasRolePermission(user?.role, 'analytics:buzo_view');
+  // El buzo solo tiene ocr:digitalize → sin navegación administrativa ni hamburguesa.
+  const hasMobileNav     = canViewDashboard || canManageUsers || canViewBuzoAnalytics;
   const isWideLayout     = currentModule === 'dashboard' || (currentModule === 'ocr' && view === 'editor');
   const sidebarItems = [
     canViewDashboard && {
@@ -674,6 +652,22 @@ export default function App() {
         />
       )}
 
+      <ImageConfirmModal
+        open={showConfirmModal && view === 'upload'}
+        previewUrl={previewUrl}
+        rotationDeg={rotationDeg}
+        onRotate={() => setRotationDeg(d => (d + 90) % 360)}
+        analysis={imageAnalysis}
+        isAnalyzing={isAnalyzing}
+        isUploading={isUploading}
+        onConfirm={() => {
+          if (!selectedZone) { showNotification('Selecciona un centro de cultivo válido.', 'error'); return; }
+          setShowConfirmModal(false);
+          handleUpload();
+        }}
+        onExit={() => setShowConfirmModal(false)}
+      />
+
       <input type="file" ref={fileInputRef}   onChange={handleFileSelect} accept="image/*" className="hidden" />
       <input type="file" ref={cameraInputRef} onChange={handleFileSelect} accept="image/*" capture="environment" className="hidden" />
 
@@ -695,7 +689,7 @@ export default function App() {
             <button
               onClick={() => {
                 setCurrentModule('ocr');
-                setView('upload');
+                resetFlow();
               }}
               className="w-full bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 h-10 rounded-none flex items-center justify-center gap-2 font-semibold text-sm transition-all shadow-md"
             >
@@ -735,9 +729,16 @@ export default function App() {
               <div className="mt-1">
                 <button
                   onClick={() => {
-                    setIsUsersNavOpen(open => !open);
-                    setCurrentModule('users');
+                    if (currentModule === 'users') {
+                      setIsUsersNavOpen(open => !open);
+                    } else {
+                      setCurrentModule('users');
+                      setAdminSection('users');
+                      setIsUsersNavOpen(true);
+                    }
                   }}
+                  aria-expanded={isUsersNavOpen}
+                  aria-controls="admin-navigation-submenu"
                   className={`group relative flex h-10 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium transition-all ${
                     currentModule === 'users'
                       ? 'bg-white text-black shadow-sm ring-1 ring-gray-200 dark:bg-zinc-900 dark:text-white dark:ring-zinc-800'
@@ -754,12 +755,8 @@ export default function App() {
                   <span className="min-w-0 truncate">Usuarios</span>
                   <ChevronDown className={`ml-auto h-4 w-4 transition-transform duration-300 ease-out ${isUsersNavOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <div
-                  className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
-                    isUsersNavOpen ? 'mt-1 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
-                  }`}
-                >
-                  <div className="overflow-hidden">
+                {isUsersNavOpen && (
+                  <div id="admin-navigation-submenu" className="mt-1">
                     <div className="space-y-1 pl-9 pt-1">
                     {[
                       { id: 'users' as const, label: 'Usuarios', icon: Users },
@@ -788,7 +785,7 @@ export default function App() {
                     })}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -848,12 +845,48 @@ export default function App() {
       {/* ── Main content ── */}
       <div className="flex-1 flex flex-col min-w-0 h-full relative bg-white dark:bg-[#0a0a0a]" onClick={() => setIsUserMenuOpen(false)}>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth pt-4 md:pt-0">
+        {/* Encabezado móvil (md:hidden). Vive fuera del scroll para permanecer fijo.
+            El buzo ve solo logo + perfil (tema/logout); admin/supervisor además la hamburguesa. */}
+        <MobileHeader
+          user={user}
+          hasNav={hasMobileNav}
+          onOpenNav={() => setIsMobileNavOpen(true)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          canViewSettings={canViewSettings}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onLogout={handleLogout}
+          onLogoClick={() => setCurrentModule(canViewDashboard ? 'dashboard' : 'ocr')}
+        />
+
+        {hasMobileNav && (
+          <MobileNavigationDrawer
+            isOpen={isMobileNavOpen}
+            onClose={() => setIsMobileNavOpen(false)}
+            user={user}
+            items={sidebarItems}
+            currentModule={currentModule}
+            canDigitalize={canDigitalize}
+            canManageUsers={canManageUsers}
+            adminSection={adminSection}
+            onNewDigitalization={() => { setCurrentModule('ocr'); resetFlow(); }}
+            onSelectAdmin={section => { setCurrentModule('users'); setAdminSection(section); }}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleTheme}
+            canViewSettings={canViewSettings}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
+        <main className="flex-1 overflow-y-auto overflow-x-hidden relative scroll-smooth md:pt-0">
           <div className="absolute inset-0">
             {/* Dashboard Module */}
-            <div className={currentModule === 'dashboard' && canViewDashboard ? 'block h-full' : 'hidden'}>
-              <Dashboard isDarkMode={isDarkMode} currentUser={user} onNotify={showNotification} />
-            </div>
+            {currentModule === 'dashboard' && canViewDashboard && (
+              <div className="h-full">
+                <Dashboard isDarkMode={isDarkMode} currentUser={user} onNotify={showNotification} />
+              </div>
+            )}
 
             {/* User Management Module */}
             {canManageUsers && user && (
@@ -889,8 +922,8 @@ export default function App() {
             {/* OCR Digitalization Module */}
             <div className={currentModule === 'ocr' ? 'block h-full' : 'hidden'}>
               {view === 'upload' && (
-                <div className="h-full overflow-hidden bg-[#f6f8fb] px-3 py-3 dark:bg-[#0a0a0a] md:px-5 md:py-4">
-                  <div className="mx-auto flex h-full max-w-[1480px] animate-in fade-in slide-in-from-bottom-3 duration-500 flex-col gap-3">
+                <div className="h-full overflow-y-auto bg-[#f6f8fb] px-3 pt-3 pb-24 dark:bg-[#0a0a0a] md:px-5 md:py-4 lg:overflow-hidden">
+                  <div className="mx-auto flex min-h-full max-w-[1480px] animate-in fade-in slide-in-from-bottom-3 duration-500 flex-col gap-3 lg:h-full">
                     <div className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                       <div>
                         <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-zinc-500">
@@ -915,7 +948,7 @@ export default function App() {
                         </div>
                         <Button
                           onClick={handleUpload}
-                          disabled={isUploading || !selectedFile || !selectedZone}
+                          disabled={isUploading || !selectedFile || !selectedZone || (imageAnalysis ? !imageAnalysis.ok : false)}
                           className="h-10 w-full px-5 text-xs tracking-wide sm:w-auto"
                         >
                           {isUploading ? (
@@ -927,8 +960,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
-                      <Card className="flex min-h-0 flex-col overflow-hidden">
+                    <div className="grid grid-cols-1 gap-3 lg:min-h-0 lg:flex-1 lg:overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)]">
+                      <Card className="flex flex-col lg:min-h-0 lg:overflow-hidden">
                         <CardHeader className="px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
@@ -942,7 +975,7 @@ export default function App() {
                             <FileImage className="h-5 w-5 text-gray-300 dark:text-zinc-600" />
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-4 overflow-y-auto">
+                        <CardContent className="space-y-4 lg:overflow-y-auto">
                           <div className="space-y-2">
                             <label className="flex items-center justify-between gap-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400 dark:text-zinc-500">
                               Zona acuícola
@@ -987,7 +1020,7 @@ export default function App() {
                         </CardContent>
                       </Card>
 
-                      <Card className="flex min-h-0 flex-col overflow-hidden">
+                      <Card className="flex flex-col lg:min-h-0 lg:overflow-hidden">
                         <CardHeader className="flex shrink-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-zinc-500">
@@ -1016,8 +1049,8 @@ export default function App() {
                             )}
                           </div>
                         </CardHeader>
-                        <CardContent className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
-                          <label className={`group relative flex min-h-[260px] flex-1 cursor-pointer items-center justify-center overflow-hidden border transition-colors md:min-h-0 ${
+                        <CardContent className="flex flex-col gap-3 p-3 md:p-4 lg:min-h-0 lg:flex-1">
+                          <label className={`group relative flex min-h-[260px] cursor-pointer items-center justify-center overflow-hidden border transition-colors lg:min-h-0 lg:flex-1 ${
                             selectedFile
                               ? 'border-gray-200 bg-white dark:border-zinc-800 dark:bg-[#050505]'
                               : 'border-dashed border-gray-300 bg-gray-50 hover:border-black dark:border-zinc-700 dark:bg-zinc-950/40 dark:hover:border-white'
@@ -1099,6 +1132,25 @@ export default function App() {
                             </div>
                           )}
 
+                          {/* Validación previa: errores (bloquean) y avisos (advierten). */}
+                          {isAnalyzing && (
+                            <div className="flex items-center gap-2 text-xs font-medium text-gray-400 dark:text-zinc-500">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analizando calidad de la imagen…
+                            </div>
+                          )}
+                          {imageAnalysis?.errors.map(msg => (
+                            <div key={msg} className="flex items-start gap-3 border border-red-200 bg-red-50 p-3 text-sm text-red-600 animate-in fade-in dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
+                              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                              <div className="font-medium leading-relaxed">{msg}</div>
+                            </div>
+                          ))}
+                          {imageAnalysis?.ok && imageAnalysis.warnings.map(msg => (
+                            <div key={msg} className="flex items-start gap-3 border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 animate-in fade-in dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-400">
+                              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                              <div className="font-medium leading-relaxed">{msg}</div>
+                            </div>
+                          ))}
+
                           <div className="shrink-0 text-xs font-medium leading-5 text-gray-400 dark:text-zinc-500">
                             {selectedFile
                               ? 'La imagen está lista para cargar la digitalización y continuar con la validación.'
@@ -1107,7 +1159,7 @@ export default function App() {
                           <div className="grid gap-3 md:hidden">
                             <Button
                               onClick={handleUpload}
-                              disabled={isUploading || !selectedFile || !selectedZone}
+                              disabled={isUploading || !selectedFile || !selectedZone || (imageAnalysis ? !imageAnalysis.ok : false)}
                               className="h-11 w-full px-5 text-xs tracking-wide"
                             >
                               {isUploading ? (

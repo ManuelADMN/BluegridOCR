@@ -62,22 +62,26 @@ def empty_day(day: date) -> dict:
         "nidos": 0,
         "cuevas": 0,
         "hembras": 0,
+        "hembras_nido": 0,
+        "hembras_cueva": 0,
         "registros": 0,
         "validados": 0,
     }
 
 
 def metric_value(row: dict, metric_id: str) -> float:
-    if metric_id == "total_pulpos":
-        return int(row["pulpos"])
-    if metric_id == "ocupacion":
+    if metric_id == "nidos_huevo":
         return int(row["nidos"])
-    if metric_id == "tasa_reproductiva":
-        return safe_pct(row["hembras"], row["nidos"])
+    if metric_id == "cuevas_cubiertas":
+        return int(row["cuevas"])
+    if metric_id == "hembras_nido":
+        return int(row["hembras_nido"])
+    if metric_id == "hembras_cueva":
+        return int(row["hembras_cueva"])
+    if metric_id == "captura_total":
+        return int(row["pulpos"])
     if metric_id == "registros_validados":
         return int(row["validados"])
-    if metric_id == "eficiencia_validacion":
-        return int(row["hembras"])
     return 0.0
 
 
@@ -121,6 +125,8 @@ def get_dashboard_data(
                 COALESCE(SUM(d.n_nidos), 0) AS nidos,
                 COALESCE(SUM(d.n_cuevas_cubiertas), 0) AS cuevas,
                 COALESCE(SUM(CASE WHEN d.captura_hembras_tipo > 0 THEN 1 ELSE 0 END), 0) AS hembras,
+                COALESCE(SUM(CASE WHEN d.captura_hembras_tipo = 1 THEN 1 ELSE 0 END), 0) AS hembras_nido,
+                COALESCE(SUM(CASE WHEN d.captura_hembras_tipo = 2 THEN 1 ELSE 0 END), 0) AS hembras_cueva,
                 COUNT(DISTINCT r.id_registro) AS registros,
                 COUNT(DISTINCT CASE WHEN r.estado_validacion = 'VALIDADO' THEN r.id_registro END) AS validados
             FROM registros_ocr r
@@ -249,6 +255,8 @@ def get_dashboard_data(
         "nidos": sum(int(row["nidos"]) for row in current_rows),
         "cuevas": sum(int(row["cuevas"]) for row in current_rows),
         "hembras": sum(int(row["hembras"]) for row in current_rows),
+        "hembras_nido": sum(int(row["hembras_nido"]) for row in current_rows),
+        "hembras_cueva": sum(int(row["hembras_cueva"]) for row in current_rows),
         "registros": sum(int(row["registros"]) for row in current_rows),
         "validados": sum(int(row["validados"]) for row in current_rows),
     }
@@ -259,46 +267,61 @@ def get_dashboard_data(
         "nidos": sum(int(row["nidos"]) for row in previous_rows),
         "cuevas": sum(int(row["cuevas"]) for row in previous_rows),
         "hembras": sum(int(row["hembras"]) for row in previous_rows),
+        "hembras_nido": sum(int(row["hembras_nido"]) for row in previous_rows),
+        "hembras_cueva": sum(int(row["hembras_cueva"]) for row in previous_rows),
         "registros": sum(int(row["registros"]) for row in previous_rows),
         "validados": sum(int(row["validados"]) for row in previous_rows),
     }
 
+    # KPIs = las 5 columnas de la tablilla (mismos datos de la tabla de detalle) + Registros validados.
     kpi_specs = [
         {
-            "id": "total_pulpos",
-            "label": "Total Pulpos",
+            "id": "nidos_huevo",
+            "label": "N° Nidos con Huevo",
             "unit": "und",
-            "description": "Pulpos registrados en detalles de captura",
-            "value": current_totals["pulpos"],
-            "current": current_totals["pulpos"],
-            "previous": previous_totals["pulpos"],
-        },
-        {
-            "id": "ocupacion",
-            "label": "Nidos encontrados",
-            "unit": "und",
-            "description": "Nidos con huevos registrados",
-            "value": current_totals["nidos"],
+            "description": "Nidos con huevo registrados (n_nidos)",
             "current": current_totals["nidos"],
             "previous": previous_totals["nidos"],
         },
         {
-            "id": "registros_validados",
-            "label": "Registros Validados",
+            "id": "cuevas_cubiertas",
+            "label": "Cuevas encontradas",
             "unit": "und",
-            "description": "Registros revisados y aprobados",
-            "value": current_totals["validados"],
-            "current": current_totals["validados"],
-            "previous": previous_totals["validados"],
+            "description": "Cuevas cubiertas registradas (n_cuevas_cubiertas)",
+            "current": current_totals["cuevas"],
+            "previous": previous_totals["cuevas"],
         },
         {
-            "id": "tasa_reproductiva",
-            "label": "Tasa Reprod.",
-            "unit": "%",
-            "description": "Filas con hembras sobre nidos registrados",
-            "value": safe_pct(current_totals["hembras"], current_totals["nidos"]),
-            "current": safe_pct(current_totals["hembras"], current_totals["nidos"]),
-            "previous": safe_pct(previous_totals["hembras"], previous_totals["nidos"]),
+            "id": "hembras_nido",
+            "label": "Captura hembras con Nido",
+            "unit": "und",
+            "description": "Filas marcadas como captura de hembra en nido",
+            "current": current_totals["hembras_nido"],
+            "previous": previous_totals["hembras_nido"],
+        },
+        {
+            "id": "hembras_cueva",
+            "label": "Captura Hembras en cueva",
+            "unit": "und",
+            "description": "Filas marcadas como captura de hembra en cueva",
+            "current": current_totals["hembras_cueva"],
+            "previous": previous_totals["hembras_cueva"],
+        },
+        {
+            "id": "captura_total",
+            "label": "Captura Total",
+            "unit": "und",
+            "description": "Total de pulpos capturados (total_pulpos)",
+            "current": current_totals["pulpos"],
+            "previous": previous_totals["pulpos"],
+        },
+        {
+            "id": "registros_validados",
+            "label": "Registros validados",
+            "unit": "und",
+            "description": "Registros revisados y aprobados",
+            "current": current_totals["validados"],
+            "previous": previous_totals["validados"],
         },
     ]
 
@@ -307,7 +330,7 @@ def get_dashboard_data(
         kpis.append({
             "id": spec["id"],
             "label": spec["label"],
-            "value": spec["value"],
+            "value": spec["current"],
             "unit": spec["unit"],
             "description": spec["description"],
             "current_period_value": spec["current"],
@@ -326,17 +349,6 @@ def get_dashboard_data(
         })
 
     eficiencia = safe_pct(current_totals["validados"], current_totals["registros"])
-    kpis.append({
-        "id": "eficiencia_validacion",
-        "label": "Huevos encontrados",
-        "value": current_totals["hembras"],
-        "unit": "und",
-        "description": "Filas con huevos/hembras registradas",
-        "current_period_value": current_totals["hembras"],
-        "previous_period_value": previous_totals["hembras"],
-        "trend_pct": trend_pct(current_totals["hembras"], previous_totals["hembras"]),
-        "series": [],
-    })
 
     bar_data = [
         {

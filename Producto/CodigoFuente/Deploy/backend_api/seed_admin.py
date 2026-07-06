@@ -1,12 +1,16 @@
+import os
+
 from create_admin import upsert_admin
 
 
 ADMIN_USERNAME = "admin@bluegrid.cl"
-ADMIN_PASSWORD = "BGCwc5NLVULdnmItX7"
 
 
 def seed_admin() -> None:
-    upsert_admin(ADMIN_USERNAME, ADMIN_PASSWORD)
+    password = os.getenv("ADMIN_PASSWORD")
+    if not password:
+        raise RuntimeError("Define ADMIN_PASSWORD antes de ejecutar seed_admin.py.")
+    upsert_admin(ADMIN_USERNAME, password)
     print(f"Usuario '{ADMIN_USERNAME}' listo como admin.")
 
 

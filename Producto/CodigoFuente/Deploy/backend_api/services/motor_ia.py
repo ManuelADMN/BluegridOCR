@@ -18,10 +18,49 @@ CLAUDE_MODEL = settings.ANTHROPIC_MODEL
 CLAUDE_OCR_AUDIT_MODEL = settings.ANTHROPIC_OCR_AUDIT_MODEL
 
 
+# Modelos que NO aceptan parámetros de sampling (temperature/top_p/top_k): enviarlos
+# devuelve HTTP 400. Es la familia de "adaptive thinking": Sonnet 5, Opus 4.7/4.8, Fable 5,
+# Mythos 5. Para estos se omite `temperature`; el resto (Sonnet 4.6 y anteriores) sí lo acepta.
+_MODELS_SIN_SAMPLING = {
+    "claude-sonnet-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-fable-5",
+    "claude-mythos-5",
+}
+
+
 def _message_options_for_model(model: str) -> dict:
-    if model in {"claude-opus-4-8", "claude-opus-4-7", "claude-fable-5", "claude-mythos-5"}:
+    # Sonnet 5 activa adaptive thinking por defecto. En esta extracción estructurada
+    # consumía el límite de salida y truncaba el JSON antes de completar las 25 celdas.
+    # Se desactiva explícitamente para reservar max_tokens íntegramente a la respuesta.
+    if model == "claude-sonnet-5":
+        return {"thinking": {"type": "disabled"}}
+    if model in _MODELS_SIN_SAMPLING:
         return {}
     return {"temperature": 0}
+
+
+def _extract_response_text(response) -> str:
+    """Return every text block, ignoring Sonnet 5 adaptive-thinking blocks."""
+    text_parts = []
+    block_types = []
+    for block in getattr(response, "content", None) or []:
+        if isinstance(block, dict):
+            block_type = block.get("type")
+            block_text = block.get("text")
+        else:
+            block_type = getattr(block, "type", None)
+            block_text = getattr(block, "text", None)
+
+        block_types.append(block_type or type(block).__name__)
+        if block_type == "text" and isinstance(block_text, str) and block_text.strip():
+            text_parts.append(block_text.strip())
+
+    if not text_parts:
+        logger.error("[MOTOR_IA] Claude no devolvió texto; bloques=%s", block_types)
+        raise ValueError("Claude no devolvió un bloque de texto utilizable")
+    return "\n".join(text_parts)
 
 COL_LABELS = [
     "N Nidos con Huevos",
@@ -1044,7 +1083,7 @@ class ClaudeGridOCRService:
             **_message_options_for_model(CLAUDE_MODEL),
         )
         elapsed = round(time.time() - t0, 2)
-        resp_text = response.content[0].text if response.content else ""
+        resp_text = _extract_response_text(response)
         logger.info("[MOTOR_IA] Pase 1 completado en %.2fs  respuesta=%d chars  tokens_usados=%s",
                     elapsed, len(resp_text),
                     getattr(response, 'usage', None) and f"in={response.usage.input_tokens} out={response.usage.output_tokens}")
@@ -1079,7 +1118,7 @@ class ClaudeGridOCRService:
                 ],
                 **_message_options_for_model(model),
             )
-            return response.content[0].text if response.content else ""
+            return _extract_response_text(response)
 
         try:
             return run(CLAUDE_OCR_AUDIT_MODEL), CLAUDE_OCR_AUDIT_MODEL
@@ -1143,7 +1182,7 @@ class ClaudeGridOCRService:
             **_message_options_for_model(CLAUDE_MODEL),
         )
         elapsed = round(time.time() - t0, 2)
-        resp_text = response.content[0].text if response.content else ""
+        resp_text = _extract_response_text(response)
         logger.info("[MOTOR_IA] full_rectangle completado en %.2fs  respuesta=%d chars", elapsed, len(resp_text))
         return resp_text
 

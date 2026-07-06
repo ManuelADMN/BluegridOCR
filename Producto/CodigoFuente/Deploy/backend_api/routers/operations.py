@@ -1,9 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse
+import anthropic
 import re
 from services.motor_ia import procesar_registro_ocr
 from services.db import get_connection
 from services.timezone import app_now_naive
+from services.audit import insert_audit_event
 from services import storage
 from dependencies.auth import require_roles
 from core.logger import logger
@@ -12,6 +14,25 @@ router = APIRouter(tags=["Operaciones OCR"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_UPLOAD_SIZE_BYTES = 8 * 1024 * 1024
+
+
+def _anthropic_http_exception(error: Exception) -> HTTPException:
+    """Translate upstream Claude failures without leaking provider internals."""
+    message = str(error).lower()
+    if "credit balance is too low" in message:
+        return HTTPException(
+            status_code=503,
+            detail="El servicio OCR no tiene créditos disponibles en Anthropic. Recarga el saldo o configura una API key con créditos.",
+        )
+    if "temperature" in message and "deprecated" in message:
+        return HTTPException(
+            status_code=502,
+            detail="La configuración del OCR no es compatible con Claude Sonnet 5. Reinicia el backend actualizado e inténtalo nuevamente.",
+        )
+    return HTTPException(
+        status_code=502,
+        detail="Anthropic no pudo procesar la plantilla. Inténtalo nuevamente en unos minutos.",
+    )
 
 
 def _parse_row_index(value) -> int | None:
@@ -299,6 +320,19 @@ async def subir_registro(
         except Exception:
             logger.warning("[OPERATIONS] No se pudo persistir la imagen del registro %s", nuevo_id, exc_info=True)
 
+        insert_audit_event(
+            cur,
+            current_user,
+            action="ocr_uploaded",
+            entity="registros_ocr",
+            entity_id=nuevo_id,
+            detail={
+                "zona_id": zona_id,
+                "filename": file.filename,
+                "file_kb": file_kb,
+                "confidence": float(resultado_ocr.get("promedio_confianza", 0.0)),
+            },
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -317,6 +351,9 @@ async def subir_registro(
 
     except HTTPException:
         raise
+    except anthropic.APIError as e:
+        logger.exception("[OPERATIONS] Anthropic rechazó el procesamiento OCR")
+        raise _anthropic_http_exception(e)
     except Exception as e:
         logger.exception("[OPERATIONS] Error inesperado en subir_registro")
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,0 +1,77 @@
+# Despliegue con HTTPS (modelo "Opción B": nginx del frontend termina TLS y hace de proxy
+# interno a /api; el backend NO se expone a internet).
+#
+# Requisitos antes de levantar:
+#   1) Certificados en ./certs/prod/  (fullchain.pem + privkey.pem)
+#        - demo/entrega:  bash scripts/gen-selfsigned-cert.sh <host-o-ip>
+#        - producción:    con dominio propio + Let's Encrypt (certbot)
+#   2) Puertos 80 y 443 TCP abiertos en el Security Group de la EC2.
+#
+# Levantar:  docker compose -f docker-compose.https.yml up -d --build
+
+services:
+  backend:
+    build:
+      context: ./Producto/CodigoFuente/Deploy/backend_api
+      dockerfile: Dockerfile
+    image: bluegridocr-backend:local
+    container_name: bluegridocr_backend_prod
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Santiago}
+      HOST: 0.0.0.0
+      PORT: 8000
+      HTTPS_ENABLED: "false"   # TLS lo termina el nginx del frontend; el backend queda interno
+      DATABASE_URL: ${DATABASE_URL:-}
+      SUPABASE_KEY: ${SUPABASE_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-not-configured}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      ANTHROPIC_OCR_AUDIT_MODEL: ${ANTHROPIC_OCR_AUDIT_MODEL:-claude-sonnet-5}
+      OCR_MODE: ${OCR_MODE:-segmented}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-not-configured}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      TRUST_PROXY_HEADERS: "true"
+      # Con TLS same-origin el navegador llama a https://<host>/api ; el origin es HTTPS.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost,https://127.0.0.1}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/data}
+    volumes:
+      - ${IMAGES_HOST_DIR:-/opt/bluegridocr/data}:/data
+    ports:
+      # Solo accesible desde la propia EC2 para depurar; no se expone a internet.
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./Producto/CodigoFuente/Front
+      dockerfile: Dockerfile
+    image: bluegridocr-frontend:local
+    container_name: bluegridocr_frontend_prod
+    restart: unless-stopped
+    environment:
+      # false: el entrypoint NO sobrescribe default.conf; usamos la conf HTTPS montada abajo,
+      # que ya incluye el proxy interno a /api.
+      ENABLE_INTERNAL_API_PROXY: "false"
+      API_BASE_URL: "${API_BASE_URL-}"
+    volumes:
+      - ./Producto/CodigoFuente/Front/nginx.https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs/prod:/etc/nginx/certs:ro
+    ports:
+      - "80:80"     # redirige a HTTPS
+      - "443:443"   # la app en https://<host> sin puerto
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

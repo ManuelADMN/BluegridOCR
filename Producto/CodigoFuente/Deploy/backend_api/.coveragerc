@@ -1,0 +1,22 @@
+[run]
+source =
+    core
+    dependencies
+    routers
+    services
+    main
+omit =
+    tests/*
+    test_*.py
+    create_admin.py
+    run_server.py
+    scratch_check_schema.py
+    seed_admin.py
+    seed_admin_final.py
+
+[report]
+show_missing = true
+skip_covered = false
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
